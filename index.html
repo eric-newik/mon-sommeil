@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b1020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sommeil">
+<title>Mon Sommeil</title>
+<style>
+:root{--bg:#0b1020;--card:#151b30;--card2:#1e2645;--line:#2a3358;--txt:#e8ecf8;--mut:#8c95b3;--acc:#8aa4ff;
+--awake:#f2b84b;--rem:#c77dff;--light:#5ec8f2;--deep:#3d5afe;--danger:#ff6b6b;--ok:#4cd6a0;--cough:#ff9f6b;--talk:#4cd6a0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+h1{font-size:26px;margin:8px 0 14px}h2{font-size:17px;margin:0 0 10px}h3{font-size:15px;margin:14px 0 6px;color:var(--mut);font-weight:600}
+.screen{display:none;padding:14px 16px calc(96px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
+.screen.active{display:block}
+.card{background:var(--card);border-radius:18px;padding:16px;margin-bottom:14px}
+.mut{color:var(--mut)}.small{font-size:13px}.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.btn{display:block;width:100%;border:0;border-radius:16px;padding:16px;font-size:17px;font-weight:600;background:var(--acc);color:#0b1020;cursor:pointer}
+.btn.sec{background:var(--card2);color:var(--txt)}.btn.danger{background:transparent;color:var(--danger);border:1px solid #ff6b6b55}
+.btn.sm{display:inline-block;width:auto;padding:9px 14px;font-size:14px;border-radius:12px}
+.btn+.btn{margin-top:10px}
+input[type=time]{background:transparent;border:0;color:var(--txt);font-size:56px;font-weight:300;width:100%;text-align:center;font-family:inherit;padding:0}
+input[type=time]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.4}
+select{background:var(--card2);color:var(--txt);border:0;border-radius:10px;padding:8px 10px;font-size:15px}
+.sw{position:relative;width:52px;height:30px;flex:none}.sw input{opacity:0;width:0;height:0}
+.sw span{position:absolute;inset:0;background:var(--card2);border-radius:30px;transition:.2s}
+.sw span:before{content:"";position:absolute;width:24px;height:24px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.sw input:checked+span{background:var(--acc)}.sw input:checked+span:before{transform:translateX(22px)}
+.line{padding:12px 0;border-top:1px solid var(--line)}.line:first-of-type{border-top:0}
+.seg{display:flex;background:var(--card2);border-radius:12px;padding:3px}
+.seg button{flex:1;border:0;background:transparent;color:var(--mut);padding:8px 4px;border-radius:9px;font-size:14px}
+.seg button.on{background:var(--acc);color:#0b1020;font-weight:600}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0e1428ee;backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav.tabs button{flex:1;background:none;border:0;color:var(--mut);padding:10px 0 12px;font-size:12px}
+nav.tabs button b{display:block;font-size:22px;font-weight:400}nav.tabs button.on{color:var(--acc)}
+.tips li{margin:4px 0}.tips{padding-left:20px;margin:6px 0 0}
+.overlay{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+.overlay.show{display:flex}
+#night{background:#000}
+.nclock{font-size:84px;font-weight:200;letter-spacing:-2px}
+.nsub{color:var(--mut);margin-top:6px}
+.meter{width:70%;height:6px;background:#1a1f33;border-radius:6px;margin:26px auto 18px;overflow:hidden}
+.meter div{height:100%;width:0;background:var(--acc);transition:width .2s}
+.ncount{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;max-width:420px;margin-top:8px}
+.ncount div{background:#0f1426;border-radius:12px;padding:10px 4px;font-size:12px;color:var(--mut)}
+.ncount b{display:block;font-size:20px;color:var(--txt);font-weight:500}
+.nbtns{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));left:24px;right:24px;display:flex;gap:10px;max-width:480px;margin:0 auto}
+.nbtns .btn{margin:0}
+.warn{background:#3a2a10;color:#ffd18a;border-radius:12px;padding:10px 12px;font-size:13px;margin-top:16px;max-width:420px;text-align:left}
+#dimmer{position:fixed;inset:0;background:#000;z-index:25;display:flex;align-items:center;justify-content:center}
+#dimmer[hidden]{display:none}#dClock{color:#fff;opacity:.13;font-size:60px;font-weight:200}
+#alarm{background:linear-gradient(180deg,#1b2350 0%,#7a4a7a 55%,#f2a65a 100%)}
+.aclock{font-size:90px;font-weight:200}#aMsg{margin:6px 0 40px;font-size:18px;opacity:.9}
+#alarm .btn{max-width:360px}
+.score{display:flex;align-items:center;gap:16px}
+.score svg{flex:none}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kv div{background:var(--card2);border-radius:12px;padding:10px 12px}
+.kv b{display:block;font-size:19px;font-weight:600}.kv span{font-size:12px;color:var(--mut)}
+canvas{width:100%;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--mut);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.phase{display:flex;align-items:center;gap:10px;margin:8px 0}
+.phase .bar{flex:1;height:8px;background:var(--card2);border-radius:8px;overflow:hidden}.phase .bar div{height:100%}
+.phase .lab{width:92px;font-size:14px}.phase .val{width:96px;text-align:right;font-size:14px}
+.clip{background:var(--card2);border-radius:14px;padding:10px 12px;margin:8px 0}
+.clip audio{width:100%;height:36px;margin-top:8px}
+.clip .x{background:none;border:0;color:var(--danger);font-size:14px;padding:4px}
+.hist{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line);cursor:pointer}
+.hist:first-child{border-top:0}.hist .sc{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;background:var(--card2);flex:none}
+.hist .mini{height:6px;border-radius:6px;overflow:hidden;display:flex;margin-top:6px}
+.empty{text-align:center;padding:30px 10px;color:var(--mut)}
+#toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#2b3566;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:50;display:none;max-width:90%}
+#modal{position:fixed;inset:0;background:#000a;z-index:60;display:none;align-items:center;justify-content:center;padding:24px}
+#modal.show{display:flex}#modal .card{max-width:380px;width:100%}
+.back{background:none;border:0;color:var(--acc);font-size:16px;padding:6px 0}
+details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--card2);color:var(--mut)}
+</style>
+</head>
+<body>
+
+<!-- ACCUEIL -->
+<section class="screen active" id="s-home">
+  <h1>Mon Sommeil</h1>
+  <div class="card">
+    <div class="row"><h2 style="margin:0">Réveil</h2><label class="sw"><input type="checkbox" id="alarmOn"><span></span></label></div>
+    <input type="time" id="wake" value="07:45">
+    <div class="line row"><span>Réveil intelligent</span><label class="sw"><input type="checkbox" id="smart"><span></span></label></div>
+    <div class="line row" id="winRow"><span>Fenêtre de réveil</span>
+      <select id="window"><option value="10">10 min</option><option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option></select></div>
+    <p class="mut small" id="wakeTxt" style="margin:8px 0 0"></p>
+  </div>
+  <button class="btn" id="bStart">🌙 Commencer la nuit</button>
+  <div class="card" style="margin-top:14px">
+    <h2>Avant de dormir</h2>
+    <ul class="tips mut small">
+      <li>Branche le téléphone et pose-le sur la table de chevet, micro tourné vers le lit (à moins d'un mètre).</li>
+      <li>Laisse l'application ouverte, écran allumé : elle s'assombrit toute seule. Ne verrouille pas le téléphone, sinon le micro s'arrête.</li>
+      <li>Monte le volume du téléphone et coupe le mode silencieux.</li>
+      <li>Garde ton réveil habituel en secours les premières nuits.</li>
+    </ul>
+  </div>
+  <div id="lastNight"></div>
+</section>
+
+<!-- HISTORIQUE -->
+<section class="screen" id="s-history">
+  <h1>Historique</h1>
+  <div id="weekCard"></div>
+  <div class="card" id="histList"></div>
+</section>
+
+<!-- RAPPORT -->
+<section class="screen" id="s-report">
+  <button class="back" id="bBack">‹ Retour</button>
+  <div id="rep"></div>
+</section>
+
+<!-- RÉGLAGES -->
+<section class="screen" id="s-settings">
+  <h1>Réglages</h1>
+  <div class="card">
+    <h2>Détection</h2>
+    <div class="line"><div class="mut small" style="margin-bottom:8px">Sensibilité du micro</div>
+      <div class="seg" id="sens"><button data-v="faible">Faible</button><button data-v="moyenne">Moyenne</button><button data-v="elevee">Élevée</button></div>
+      <p class="mut small">Élevée si le téléphone est loin du lit ; faible si la pièce est bruyante (ventilateur, rue).</p></div>
+    <div class="line row"><span>Extraits audio gardés par nuit</span>
+      <select id="maxClips"><option value="5">5</option><option value="10">10</option><option value="20">20</option><option value="0">Aucun</option></select></div>
+  </div>
+  <div class="card">
+    <h2>Sonnerie</h2>
+    <div class="seg" id="sound"><button data-v="doux">Douce</button><button data-v="carillon">Carillon</button><button data-v="perso">Mon fichier</button></div>
+    <div id="persoRow" class="line" style="margin-top:10px"><input type="file" id="persoFile" accept="audio/*" style="font-size:13px;color:var(--mut)"><div class="mut small" id="persoName"></div></div>
+    <div class="line row"><span>Montée progressive du volume</span>
+      <select id="ramp"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option></select></div>
+    <div class="line row"><span>Snooze</span>
+      <select id="snooze"><option value="5">5 min</option><option value="9">9 min</option><option value="10">10 min</option></select></div>
+    <button class="btn sec" id="bTest" style="margin-top:6px">▶︎ Tester la sonnerie (5 s)</button>
+  </div>
+  <div class="card">
+    <h2>Données</h2>
+    <p class="mut small">Tout reste sur ce téléphone, dans le navigateur. Rien n'est envoyé sur Internet.</p>
+    <button class="btn sec" id="bDemo">Générer une nuit de démonstration</button>
+    <button class="btn sec" id="bExport">Exporter mes nuits (JSON)</button>
+    <button class="btn danger" id="bWipe">Tout effacer</button>
+  </div>
+  <div class="card">
+    <h2>Comment ça marche</h2>
+    <details><summary>Détection des sons</summary>
+      <p class="mut small">Le micro mesure en continu le niveau sonore et le compare au bruit de fond de la chambre, qui s'ajuste tout seul. Chaque son qui dépasse ce fond est analysé : durée, attaque, répartition graves / médiums / aigus, rythme.</p>
+      <p class="mut small">• <b>Mouvement</b> : froissement bref et large bande (draps).<br>• <b>Ronflement</b> : son grave qui revient régulièrement toutes les 2 à 10 s (au moins 3 de suite).<br>• <b>Toux</b> : son court, fort, à attaque brutale.<br>• <b>Parole</b> : son de plus d'une seconde dans les médiums, haché en syllabes.<br>• <b>Bruit</b> : son long (plus de 11 s) venant de l'extérieur, ignoré pour les phases.</p></details>
+    <details><summary>Phases de sommeil</summary>
+      <p class="mut small">Comme Sleep Cycle, l'app se base sur tes mouvements : beaucoup de mouvements = éveil ou sommeil léger, immobilité prolongée = sommeil profond. Elle repère les pics d'agitation qui marquent la fin de chaque cycle (souvent 80 à 110 min) et place le sommeil paradoxal en fin de cycle, plus long en fin de nuit.</p>
+      <p class="mut small">C'est une <b>estimation</b> : seule une polysomnographie (avec mesure de l'activité du cerveau) mesure vraiment les phases. Utile pour suivre des tendances, pas pour poser un diagnostic.</p></details>
+    <details><summary>Réveil intelligent</summary>
+      <p class="mut small">Pendant la fenêtre choisie, dès qu'un mouvement net est détecté (signe de sommeil léger), la sonnerie démarre doucement. Sinon elle sonne à l'heure prévue.</p></details>
+  </div>
+  <p class="mut small" style="text-align:center">Mon Sommeil · version 1.1</p>
+</section>
+
+<nav class="tabs" id="tabs">
+  <button data-s="home" class="on"><b>🌙</b>Nuit</button>
+  <button data-s="history"><b>📈</b>Historique</button>
+  <button data-s="settings"><b>⚙︎</b>Réglages</button>
+</nav>
+
+<!-- NUIT EN COURS -->
+<div class="overlay" id="night">
+  <div class="nclock" id="nClock">--:--</div>
+  <div class="nsub" id="nAlarm"></div>
+  <div class="meter"><div id="nMeter"></div></div>
+  <div class="nsub small" id="nStatus">Calibrage du bruit de fond…</div>
+  <div class="ncount">
+    <div><b id="cMov">0</b>Mouvements</div><div><b id="cSnore">0</b>Ronflements</div>
+    <div><b id="cCough">0</b>Toux</div><div><b id="cTalk">0</b>Paroles</div>
+  </div>
+  <div class="nsub small" id="nLast"></div>
+  <div class="warn" id="wlWarn" hidden>Ton navigateur ne peut pas garder l'écran allumé tout seul. Règle le verrouillage automatique sur « Jamais » le temps de la nuit (Réglages › Luminosité / Affichage).</div>
+  <div class="nbtns"><button class="btn sec" id="bDim">Assombrir</button><button class="btn sec" id="bEnd">Terminer</button></div>
+  <div id="dimmer" hidden><div id="dClock"></div></div>
+</div>
+
+<!-- SONNERIE -->
+<div class="overlay" id="alarm">
+  <div class="aclock" id="aClock">--:--</div>
+  <div id="aMsg">Bonjour !</div>
+  <button class="btn sec" id="bSnooze">Snooze</button>
+  <button class="btn" id="bUp">☀️ Je suis réveillé</button>
+</div>
+
+<div id="toast"></div>
+<div id="modal"><div class="card"><p id="mText"></p><button class="btn" id="mOk">OK</button><button class="btn sec" id="mNo">Annuler</button></div></div>
+
+<script>
+'use strict';
+/* ---------- utilitaires ---------- */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const pad=n=>String(n).padStart(2,'0');
+const hm=t=>{const d=new Date(t);return pad(d.getHours())+':'+pad(d.getMinutes())};
+const fmtDur=min=>{min=Math.round(min);const h=Math.floor(min/60),m=min%60;return h?h+' h '+pad(m):m+' min'};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const JOURS=['dim.','lun.','mar.','mer.','jeu.','ven.','sam.'],MOIS=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+const dayLabel=t=>{const d=new Date(t);return JOURS[d.getDay()]+' '+d.getDate()+' '+MOIS[d.getMonth()]};
+function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',ms)}
+function ask(msg,ok='Confirmer'){return new Promise(res=>{$('#mText').textContent=msg;$('#mOk').textContent=ok;$('#modal').classList.add('show');
+  const done=v=>{$('#modal').classList.remove('show');$('#mOk').onclick=$('#mNo').onclick=null;res(v)};$('#mOk').onclick=()=>done(true);$('#mNo').onclick=()=>done(false)})}
+
+const TYPES={mouvement:{l:'Mouvement',i:'🔄'},ronflement:{l:'Ronflement',i:'😴'},toux:{l:'Toux',i:'😷'},parole:{l:'Parole',i:'💬'},bruit:{l:'Bruit',i:'🔊'}};
+const STAGES=[{l:'Éveil',c:'#f2b84b'},{l:'Léger',c:'#5ec8f2'},{l:'Paradoxal',c:'#c77dff'},{l:'Profond',c:'#3d5afe'}];
+
+/* ---------- réglages ---------- */
+const DEF={wake:'07:45',smart:true,window:30,alarmOn:true,sens:'moyenne',maxClips:10,sound:'doux',ramp:60,snooze:9};
+let S=Object.assign({},DEF,(()=>{try{return JSON.parse(localStorage.getItem('sommeil.settings')||'{}')}catch(e){return{}}})());
+const saveS=()=>{try{localStorage.setItem('sommeil.settings',JSON.stringify(S))}catch(e){}};
+
+/* ---------- stockage (IndexedDB, repli mémoire) ---------- */
+const DB={db:null,mem:{nights:new Map(),clips:new Map(),files:new Map()},
+  async open(){try{this.db=await new Promise((res,rej)=>{const r=indexedDB.open('monSommeil',1);
+    r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('nights',{keyPath:'id'});d.createObjectStore('clips',{keyPath:'id'}).createIndex('nightId','nightId');d.createObjectStore('files',{keyPath:'key'})};
+    r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+    if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}catch(e){this.db=null;console.warn('IndexedDB indisponible',e)}},
+  tx(store,mode,fn){return new Promise((res,rej)=>{const t=this.db.transaction(store,mode),r=fn(t.objectStore(store));let out;if(r)r.onsuccess=()=>out=r.result;t.oncomplete=()=>res(out);t.onerror=t.onabort=()=>rej(t.error)})},
+  put(s,o){if(!this.db){this.mem[s].set(o.id||o.key,o);return Promise.resolve()}return this.tx(s,'readwrite',st=>st.put(o))},
+  get(s,k){if(!this.db)return Promise.resolve(this.mem[s].get(k));return this.tx(s,'readonly',st=>st.get(k))},
+  all(s){if(!this.db)return Promise.resolve([...this.mem[s].values()]);return this.tx(s,'readonly',st=>st.getAll())},
+  del(s,k){if(!this.db){this.mem[s].delete(k);return Promise.resolve()}return this.tx(s,'readwrite',st=>st.delete(k))},
+  clipsOf(id){if(!this.db)return Promise.resolve([...this.mem.clips.values()].filter(c=>c.nightId===id));return this.tx('clips','readonly',st=>st.index('nightId').getAll(id))},
+  async clearAll(){for(const s of ['nights','clips']){if(!this.db)this.mem[s].clear();else await this.tx(s,'readwrite',st=>st.clear())}}
+};
+
+/* ---------- modèle d'une nuit ---------- */
+function newNight(start){return{id:'n'+start,start,end:null,status:'en_cours',m:{act:[],db:[],dbn:[],mov:[],cough:[],talk:[],snore:[],noise:[]},events:[],snoreEps:[],gaps:[],floor:null,alarm:null,analysis:null,demo:false}}
+function ensureMin(n,i){const m=n.m;while(m.act.length<=i){for(const k in m)m[k].push(0)}}
+function addEvent(n,e){
+  const i=Math.max(0,Math.floor((e.t-n.start)/60000));ensureMin(n,i);const m=n.m;
+  switch(e.type){
+    case 'mouvement':m.act[i]+=1+Math.min(2,Math.max(0,e.p)/15);m.mov[i]++;break;
+    case 'toux':m.act[i]+=0.7;m.cough[i]++;break;
+    case 'parole':m.act[i]+=0.4;m.talk[i]++;break;
+    case 'bruit':m.noise[i]++;break;
+    case 'ronflement':m.snore[i]+=e.d;return;
+  }
+  n.events.push({t:Math.round(e.t),type:e.type,d:+e.d.toFixed(1),p:+e.p.toFixed(1)});
+}
+
+/* ---------- estimation des phases ---------- */
+function analyze(n){
+  const act=n.m.act,N=act.length;if(!N)return null;
+  const sig=4,R=12,w=[];for(let k=-R;k<=R;k++)w.push(Math.exp(-k*k/(2*sig*sig)));
+  const s=act.map((_,i)=>{let a=0,b=0;for(let k=-R;k<=R;k++){const j=i+k;if(j<0||j>=N)continue;a+=act[j]*w[k+R];b+=w[k+R]}return a/b});
+  const so=[...s].sort((a,b)=>a-b),pct=p=>so[Math.min(N-1,Math.floor(p*(N-1)))];
+  const ref=Math.max(pct(0.85),0.35);
+  // endormissement : 10 minutes calmes
+  let onset=N;for(let i=0;i+10<=N;i++){let t=0;for(let j=i;j<i+10;j++)t+=act[j];if(t<2.5){onset=i;break}}
+  if(N<10)onset=0;
+  // fins de cycles = pics d'agitation espacés d'au moins 60 min
+  const peaks=[];
+  for(let i=onset+55;i<N-5;i++){if(s[i]<0.5*ref)continue;let mx=true;for(let k=-15;k<=15;k++){const j=i+k;if(j>=0&&j<N&&s[j]>s[i]){mx=false;break}}if(!mx)continue;
+    const last=peaks[peaks.length-1];if(last!==undefined&&i-last<60){if(s[i]>s[last])peaks[peaks.length-1]=i;continue}peaks.push(i)}
+  let b=[onset,...peaks,N];const b2=[b[0]];
+  for(let k=1;k<b.length;k++){const a=b2[b2.length-1],z=b[k],len=z-a;if(len>130){const parts=Math.round(len/90);for(let q=1;q<parts;q++)b2.push(Math.round(a+len*q/parts))}if(z>b2[b2.length-1])b2.push(z)}
+  b=b2;
+  const st=new Array(N).fill(1);
+  for(let c=0;c<b.length-1;c++){const a=b[c],z=b[c+1],last=c===b.length-2,len=Math.max(last?90:60,z-a);
+    const deepThr=c<2?0.22:(c<3?0.14:0.07),remStart=c===0?0.82:(c===1?0.72:0.62);
+    for(let i=a;i<z;i++){const ph=(i-a)/len,L=s[i]/ref;
+      if(L<deepThr&&ph>0.08&&ph<0.65)st[i]=3;else if(ph>=remStart&&L<0.85)st[i]=2;else st[i]=1}}
+  for(let i=0;i<N;i++){if(i<onset)st[i]=0;else if(act[i]>=5||(act[i]>=3&&s[i]>1.6*ref))st[i]=0}
+  // lissage des épisodes isolés d'une minute (hors éveil)
+  for(let i=1;i<N-1;i++){if(st[i]!==0&&st[i-1]===st[i+1]&&st[i]!==st[i-1]&&st[i-1]!==0)st[i]=st[i-1]}
+  // fin de nuit : éveil final
+  const tot=[0,0,0,0];st.forEach(v=>tot[v]++);
+  let awak=0;for(let i=onset+1;i<N;i++)if(st[i]===0&&st[i-1]!==0)awak++;
+  const asleep=N-tot[0],eff=asleep/N,snoreMin=n.m.snore.reduce((a,v)=>a+v,0)/60;
+  let sc=10+40*clamp(asleep/450,0,1)+25*clamp((eff-0.6)/0.35,0,1)+15*clamp(tot[3]/Math.max(1,asleep)/0.18,0,1)+10*clamp(tot[2]/Math.max(1,asleep)/0.2,0,1);
+  sc-=Math.min(10,awak*1.5);sc-=Math.min(10,snoreMin/6);
+  return{st,onset,bounds:b,cycles:Math.max(0,b.length-1),tot,asleep,awak,eff,snoreMin,score:Math.round(clamp(sc,0,100))};
+}
+function finalizeNight(n){
+  const dur=Math.max(1,Math.ceil(((n.end||Date.now())-n.start)/60000));ensureMin(n,dur-1);
+  n.analysis=analyze(n);
+  const c={mouvement:0,toux:0,parole:0,bruit:0};n.events.forEach(e=>{if(c[e.type]!==undefined)c[e.type]++});
+  c.ronfMin=n.m.snore.reduce((a,v)=>a+v,0)/60;c.episodes=n.snoreEps.length;n.counts=c;
+}
+
+/* ---------- WAV ---------- */
+function wavFromFloat(f,rate){
+  let mean=0;for(let i=0;i<f.length;i++)mean+=f[i];mean/=f.length||1;
+  let pk=1e-6;for(let i=0;i<f.length;i++){const v=Math.abs(f[i]-mean);if(v>pk)pk=v}
+  const g=Math.min(30,0.8/pk),N=f.length,buf=new ArrayBuffer(44+N*2),v=new DataView(buf),sr=Math.round(rate);
+  const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+  w(0,'RIFF');v.setUint32(4,36+N*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,N*2,true);
+  for(let i=0;i<N;i++)v.setInt16(44+i*2,clamp((f[i]-mean)*g,-1,1)*32767,true);
+  return buf;
+}
+
+/* ---------- enregistreur de nuit ---------- */
+const SENS={faible:12,moyenne:8,elevee:5};
+class Tracker{
+  async start(ctx,opts){
+    this.ctx=ctx;
+    this.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
+    const sr=ctx.sampleRate;this.N=2048;this.fd=this.N/sr;
+    this.src=ctx.createMediaStreamSource(this.stream);
+    this.an=ctx.createAnalyser();this.an.fftSize=2048;this.an.smoothingTimeConstant=0;this.freq=new Float32Array(this.an.frequencyBinCount);
+    this.proc=ctx.createScriptProcessor(this.N,1,1);this.mute=ctx.createGain();this.mute.gain.value=0;
+    this.src.connect(this.an);this.src.connect(this.proc);this.proc.connect(this.mute);this.mute.connect(ctx.destination);
+    const bin=sr/2048,B=(a,z)=>[Math.max(1,Math.round(a/bin)),Math.min(this.freq.length-1,Math.round(z/bin))];
+    this.bL=B(60,300);this.bM=B(300,3000);this.bH=B(3000,8000);
+    this.dec=Math.max(1,Math.round(sr/16000));this.rate=sr/this.dec;this.ringLen=Math.ceil(this.rate*75);this.ring=new Float32Array(this.ringLen);this.total=0;
+    this.thr=SENS[S.sens]||8;this.maxClips=+S.maxClips;
+    const n=this.night=newNight(Date.now());n.sens=S.sens;n.alarm=opts.alarm;n.rate=this.rate;
+    this.floor=null;this.init=[];this.ev=null;this.pend=[];this.ep=null;this.clipQ=[];this.clips=[];
+    this.lastProc=Date.now();this.lastSave=Date.now();this.lastTick=0;this.level=-100;this.running=true;
+    this.proc.onaudioprocess=e=>{try{this.process(e)}catch(err){console.error(err)}};
+    await DB.put('nights',n);
+  }
+  process(e){
+    if(!this.running)return;
+    const x=e.inputBuffer.getChannelData(0),L=x.length,now=Date.now(),n=this.night;
+    if(now-this.lastProc>5000)n.gaps.push([this.lastProc,now]);
+    this.lastProc=now;
+    let s=0;for(let i=0;i<L;i++)s+=x[i]*x[i];const db=10*Math.log10(s/L+1e-12);
+    const sIdx=this.total,d=this.dec;
+    for(let i=0;i+d<=L;i+=d){let a=0;for(let k=0;k<d;k++)a+=x[i+k];this.ring[this.total%this.ringLen]=a/d;this.total++}
+    this.an.getFloatFrequencyData(this.freq);
+    const band=r=>{let p=0;for(let i=r[0];i<=r[1];i++){const v=this.freq[i];if(v>-200)p+=Math.pow(10,v/10)}return p};
+    const lp=band(this.bL),mp=band(this.bM),hp=band(this.bH);
+    this.level=db;
+    const mi=Math.floor((now-n.start)/60000);ensureMin(n,mi);const k=n.m.dbn[mi];n.m.db[mi]=(n.m.db[mi]*k+db)/(k+1);n.m.dbn[mi]=k+1;
+    if(this.floor===null){this.init.push(db);if(this.init.length<50)return;const so=[...this.init].sort((a,b)=>a-b);this.floor=so[Math.floor(so.length*0.3)];n.floor=this.floor;return}
+    const ex=db-this.floor,active=ex>this.thr;
+    if(!this.ev){if(active)this.ev={t:now,sIdx,eIdx:this.total,fr:[],lp:0,mp:0,hp:0,quiet:0,peak:ex,act:0};
+      else this.floor+=(db<this.floor?0.05:0.002)*(db-this.floor)}
+    if(this.ev){const ev=this.ev;ev.fr.push(ex);if(ex>ev.peak)ev.peak=ex;
+      if(active){ev.quiet=0;ev.act=ev.fr.length;ev.lp+=lp;ev.mp+=mp;ev.hp+=hp;ev.eIdx=this.total}else ev.quiet++;
+      if(ev.quiet>=Math.round(0.35/this.fd)||ev.fr.length*this.fd>12)this.endEvent()}
+    if(now-this.lastTick>=1000){this.lastTick=now;
+      while(this.pend.length&&now-this.pend[0].t>40000){const c=this.pend.shift();c.type='mouvement';this.commit(c)}
+      if(this.ep&&now-this.ep.last>20000)this.closeEp();
+      this.flushClips(false);
+      if(now-this.lastSave>60000){this.lastSave=now;DB.put('nights',n).catch(()=>{})}}
+  }
+  endEvent(){
+    const ev=this.ev;this.ev=null;const fr=ev.fr.slice(0,ev.act),dur=fr.length*this.fd;
+    if(dur<0.12)return;
+    const tot=ev.lp+ev.mp+ev.hp+1e-20,fl=ev.lp/tot,fm=ev.mp/tot,fh=ev.hp/tot;
+    let pi=0;while(pi<fr.length-1&&fr[pi]<ev.peak-6)pi++;const attack=pi*this.fd;
+    let syl=0,mode=1,ext=-1e9;
+    for(const v of fr){if(mode===1){if(v>ext)ext=v;else if(v<ext-4){if(ext>this.thr+2)syl++;mode=0;ext=v}}else{if(v<ext)ext=v;else if(v>ext+4){mode=1;ext=v}}}
+    if(mode===1&&ext>this.thr+2)syl++;
+    let type;
+    if(dur>=11)type='bruit';
+    else if(dur>=0.8&&fm>=0.45&&syl>=3&&syl/dur>=1.3&&fl<0.4)type='parole';
+    else if(attack<=0.1&&ev.peak>=this.thr+9&&fm+fh>=0.55&&(dur<=0.8||(dur<=2.5&&syl<=3)))type='toux';
+    else if(dur>=0.4&&dur<=4&&fl>=0.35&&fh<0.2)type='snore?';
+    else type='mouvement';
+    const e={t:ev.t,d:dur,p:ev.peak,type,sIdx:ev.sIdx,eIdx:ev.eIdx};
+    if(type==='bruit'){const so=[...fr].sort((a,b)=>a-b);this.floor+=Math.max(0,so[Math.floor(so.length/2)]-2)}
+    if(type==='snore?')this.snoreCand(e);else this.commit(e);
+  }
+  commit(e){addEvent(this.night,e);this.onEvent&&this.onEvent(e);this.considerClip(e)}
+  snoreCand(e){
+    if(this.ep&&e.t-this.ep.last<=15000){this.addSnore(e);return}
+    this.pend.push(e);
+    const rec=this.pend.filter(c=>e.t-c.t<=45000),k=rec.length;
+    if(k>=3){const i1=(rec[k-1].t-rec[k-2].t)/1000,i2=(rec[k-2].t-rec[k-3].t)/1000;
+      if(i1>=1.8&&i1<=10&&i2>=1.8&&i2<=10&&Math.abs(i1-i2)<=Math.max(i1,i2)*0.6){
+        this.ep={t:rec[0].t,last:0,n:0,p:-100};this.pend=this.pend.filter(c=>!rec.includes(c));
+        rec.forEach(c=>this.addSnore(c));
+        this.considerClip({type:'ronflement',p:Math.max(...rec.map(c=>c.p)),sIdx:rec[0].sIdx,eIdx:e.eIdx,t:rec[0].t})}}
+  }
+  addSnore(e){const ep=this.ep;ep.last=e.t+e.d*1000;ep.n++;ep.p=Math.max(ep.p,e.p);const r={...e,type:'ronflement'};addEvent(this.night,r);this.onEvent&&this.onEvent(r)}
+  closeEp(){const ep=this.ep;this.ep=null;this.night.snoreEps.push({t:ep.t,d:Math.round((ep.last-ep.t)/1000),n:ep.n,p:+ep.p.toFixed(1)});this.onEvent&&this.onEvent({type:'episode'})}
+  considerClip(e){
+    if(!this.maxClips)return;
+    if(e.type==='mouvement'&&e.p<this.thr+8)return;
+    if(e.type==='bruit'&&e.p<this.thr+12)return;
+    const R=this.rate,score=e.p+({parole:6,toux:4,ronflement:3,mouvement:0,bruit:-3}[e.type]||0);
+    const from=e.sIdx-Math.round(3*R);let to=e.eIdx+Math.round(3*R);if(to-from>30*R)to=from+Math.round(30*R);
+    const last=this.clipQ[this.clipQ.length-1];
+    if(last&&from<=last.to){last.to=Math.min(Math.max(last.to,to),last.from+Math.round(30*R));if(score>last.score){last.score=score;last.type=e.type}return}
+    this.clipQ.push({from,to,score,type:e.type,t:e.t-3000});
+  }
+  flushClips(force){while(this.clipQ.length&&(force||this.total>=this.clipQ[0].to))this.saveClip(this.clipQ.shift())}
+  saveClip(c){
+    const from=Math.max(c.from,this.total-this.ringLen+1,0),to=Math.min(c.to,this.total);if(to-from<this.rate*0.5)return;
+    if(this.clips.length>=this.maxClips){let mi=0;for(let i=1;i<this.clips.length;i++)if(this.clips[i].score<this.clips[mi].score)mi=i;
+      if(this.clips[mi].score>=c.score)return;const old=this.clips.splice(mi,1)[0];DB.del('clips',old.id).catch(()=>{})}
+    const len=to-from,f=new Float32Array(len);for(let i=0;i<len;i++)f[i]=this.ring[(from+i)%this.ringLen];
+    const meta={id:'c'+Math.round(c.t)+'_'+Math.random().toString(36).slice(2,6),nightId:this.night.id,t:c.t,type:c.type,score:+c.score.toFixed(1),dur:+(len/this.rate).toFixed(1)};
+    this.clips.push(meta);DB.put('clips',{...meta,wav:wavFromFloat(f,this.rate)}).catch(()=>{});
+  }
+  async stop(){
+    const n=this.night;if(!this.running)return n;this.running=false;
+    try{this.proc.onaudioprocess=null;this.proc.disconnect();this.src.disconnect();this.an.disconnect()}catch(e){}
+    this.stream.getTracks().forEach(t=>t.stop());
+    this.running=true;if(this.ev)this.endEvent();this.pend.splice(0).forEach(c=>{c.type='mouvement';this.commit(c)});if(this.ep)this.closeEp();this.flushClips(true);this.running=false;
+    n.end=Date.now();n.status='terminee';finalizeNight(n);await DB.put('nights',n);return n;
+  }
+}
+
+/* ---------- sonnerie ---------- */
+function softNote(ctx,out,f,t){const o=ctx.createOscillator(),o2=ctx.createOscillator(),e=ctx.createGain(),e2=ctx.createGain();
+  o.type='sine';o.frequency.value=f;o2.type='triangle';o2.frequency.value=f*2;e2.gain.value=0.12;o.connect(e);o2.connect(e2);e2.connect(e);e.connect(out);
+  e.gain.setValueAtTime(0.0001,t);e.gain.exponentialRampToValueAtTime(0.5,t+0.03);e.gain.exponentialRampToValueAtTime(0.001,t+1.5);o.start(t);o2.start(t);o.stop(t+1.6);o2.stop(t+1.6)}
+function bellNote(ctx,out,f,t){[[1,.5,3],[2.76,.25,1.6],[5.4,.12,.9],[8.93,.06,.5]].forEach(([r,a,dec])=>{const o=ctx.createOscillator(),e=ctx.createGain();
+  o.frequency.value=f*r;o.connect(e);e.connect(out);e.gain.setValueAtTime(0.0001,t);e.gain.exponentialRampToValueAtTime(a,t+0.01);e.gain.exponentialRampToValueAtTime(0.0001,t+dec);o.start(t);o.stop(t+dec+0.05)})}
+const Alarm={iv:null,vi:null,nodes:[],master:null,
+  async play(rampSec){const ctx=App.ctx;try{await ctx.resume()}catch(e){}this.stop();
+    const g=ctx.createGain(),t0=ctx.currentTime;g.gain.setValueAtTime(0.03,t0);g.gain.linearRampToValueAtTime(1,t0+Math.max(3,rampSec||S.ramp));g.connect(ctx.destination);this.master=g;
+    if(navigator.vibrate)this.vi=setInterval(()=>navigator.vibrate([500,300,500]),3500);
+    if(S.sound==='perso'){const f=await DB.get('files','alarm');if(f){try{const b=await ctx.decodeAudioData(f.data.slice(0));const s=ctx.createBufferSource();s.buffer=b;s.loop=true;s.connect(g);s.start();this.nodes.push(s);return}catch(e){toast('Fichier illisible, sonnerie douce à la place')}}}
+    const bell=S.sound==='carillon',seq=bell?[659.25,523.25,587.33,392,392,587.33,659.25,523.25]:[523.25,659.25,783.99,880,783.99,659.25,587.33,659.25];let k=0;
+    const step=()=>{const t=ctx.currentTime+0.05,f=seq[k++%seq.length];bell?bellNote(ctx,g,f,t):softNote(ctx,g,f,t)};
+    step();this.iv=setInterval(step,bell?1300:650)},
+  stop(){clearInterval(this.iv);clearInterval(this.vi);this.iv=this.vi=null;try{navigator.vibrate&&navigator.vibrate(0)}catch(e){}
+    this.nodes.forEach(n=>{try{n.stop()}catch(e){}});this.nodes=[];
+    if(this.master){const g=this.master,c=App.ctx;try{g.gain.cancelScheduledValues(c.currentTime);g.gain.setValueAtTime(0,c.currentTime)}catch(e){}setTimeout(()=>{try{g.disconnect()}catch(e){}},300);this.master=null}}
+};
+
+/* ---------- application ---------- */
+const App={ctx:null,tr:null,wl:null,timer:null,ringing:false,snoozeT:null,night:null,dimT:null,cur:'home'};
+function ensureCtx(){if(!App.ctx){App.ctx=new (window.AudioContext||window.webkitAudioContext)();}
+  // débloque la lecture audio (iOS) pendant le geste de l'utilisateur
+  try{const b=App.ctx.createBuffer(1,1,22050),s=App.ctx.createBufferSource();s.buffer=b;s.connect(App.ctx.destination);s.start(0)}catch(e){}
+  return App.ctx.resume().catch(()=>{})}
+function nextWake(hhmm,from){const[h,m]=hhmm.split(':').map(Number),d=new Date(from);d.setHours(h,m,0,0);if(d.getTime()<=from+60000)d.setDate(d.getDate()+1);return d.getTime()}
+
+function show(name){App.cur=name;$$('.screen').forEach(s=>s.classList.toggle('active',s.id==='s-'+name));
+  $$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.s===name||(name==='report'&&b.dataset.s==='history')));
+  if(name==='history')renderHistory();if(name==='home')renderHome();window.scrollTo(0,0)}
+$$('#tabs button').forEach(b=>b.onclick=()=>show(b.dataset.s));
+$('#bBack').onclick=()=>show(App.backTo||'history');
+
+/* accueil */
+function syncHome(){$('#wake').value=S.wake;$('#alarmOn').checked=S.alarmOn;$('#smart').checked=S.smart;$('#window').value=S.window;
+  $('#winRow').style.display=S.smart?'':'none';
+  const w=nextWake(S.wake,Date.now());
+  $('#wakeTxt').textContent=!S.alarmOn?'Pas de réveil : l\'analyse s\'arrête quand tu appuies sur « Terminer ».':
+    S.smart?`Je te réveillerai entre ${hm(w-S.window*60000)} et ${hm(w)}, au premier signe de sommeil léger.`:`Sonnerie à ${hm(w)}.`}
+$('#wake').onchange=e=>{S.wake=e.target.value||'07:45';saveS();syncHome()};
+$('#alarmOn').onchange=e=>{S.alarmOn=e.target.checked;saveS();syncHome()};
+$('#smart').onchange=e=>{S.smart=e.target.checked;saveS();syncHome()};
+$('#window').onchange=e=>{S.window=+e.target.value;saveS();syncHome()};
+async function renderHome(){syncHome();const ns=(await DB.all('nights')).filter(n=>n.status!=='en_cours').sort((a,b)=>b.start-a.start);const box=$('#lastNight');
+  if(!ns.length){box.innerHTML='';return}const n=ns[0],a=n.analysis||{};
+  box.innerHTML=`<div class="card hist" style="border:0" id="lnCard"><div class="sc" style="color:${scoreColor(a.score)}">${a.score??'–'}</div><div style="flex:1"><b>Dernière nuit</b> <span class="mut small">${dayLabel(n.end||n.start)}</span><div class="mut small">${fmtDur(a.asleep||0)} de sommeil · ${hm(n.start)} → ${hm(n.end||n.start)}</div></div><span class="mut">›</span></div>`;
+  $('#lnCard').onclick=()=>openReport(n.id,'home')}
+
+/* nuit */
+async function startNight(){
+  if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('Micro indisponible : la page doit être ouverte en https',4000);return}
+  await ensureCtx();
+  const now=Date.now(),wake=nextWake(S.wake,now);
+  const alarm={on:S.alarmOn,wake,winStart:S.smart?wake-S.window*60000:wake,smart:S.smart};
+  const tr=new Tracker();tr.onEvent=onLive;
+  try{await tr.start(App.ctx,{alarm})}catch(e){console.error(e);toast('Accès au micro refusé ou impossible',4000);return}
+  App.tr=tr;App.ringing=false;
+  ['cMov','cSnore','cCough','cTalk'].forEach(id=>$('#'+id).textContent='0');$('#nLast').textContent='';
+  $('#nAlarm').textContent=!alarm.on?'Sans réveil':alarm.smart?`Réveil intelligent ${hm(alarm.winStart)} – ${hm(alarm.wake)}`:`Réveil à ${hm(alarm.wake)}`;
+  $('#night').classList.add('show');keepAwake();
+  App.timer=setInterval(nightTick,1000);nightTick();
+  clearTimeout(App.dimT);App.dimT=setTimeout(dim,60000);
+}
+async function keepAwake(){try{if('wakeLock' in navigator){App.wl=await navigator.wakeLock.request('screen');$('#wlWarn').hidden=true}else $('#wlWarn').hidden=false}catch(e){$('#wlWarn').hidden=false}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&(App.tr&&App.tr.running||App.ringing))keepAwake()});
+function releaseAwake(){try{App.wl&&App.wl.release()}catch(e){}App.wl=null}
+function onLive(e){const n=App.tr.night,c=n.counts||{};
+  const cnt=t=>n.events.filter(x=>x.type===t).length;
+  $('#cMov').textContent=cnt('mouvement');$('#cCough').textContent=cnt('toux');$('#cTalk').textContent=cnt('parole');
+  $('#cSnore').textContent=n.snoreEps.length+(App.tr.ep?1:0);
+  if(TYPES[e.type])$('#nLast').textContent=`Dernier : ${TYPES[e.type].l.toLowerCase()} à ${hm(Date.now())}`}
+function nightTick(){const now=Date.now(),t=hm(now);$('#nClock').textContent=t;$('#dClock').textContent=t;const tr=App.tr;if(!tr||!tr.running)return;
+  if(tr.floor!==null){$('#nStatus').textContent='Écoute en cours · fond '+Math.round(tr.floor)+' dB';$('#nMeter').style.width=clamp((tr.level-tr.floor)/30*100,2,100)+'%';
+    $('#nMeter').style.background=tr.level-tr.floor>tr.thr?'#f2b84b':'#8aa4ff'}
+  const a=tr.night.alarm;if(!a.on||App.ringing)return;
+  if(now>=a.wake)ring('heure');
+  else if(a.smart&&now>=a.winStart&&now-tr.night.start>30*60000&&recentAct(tr.night)>=1.5)ring('leger');
+}
+function recentAct(n){const m=n.m.act,i=m.length-1;let s=0;for(let k=Math.max(0,i-2);k<=i;k++)s+=m[k];return s}
+function dim(){$('#dimmer').hidden=false}
+$('#bDim').onclick=dim;
+$('#dimmer').onclick=()=>{$('#dimmer').hidden=true;clearTimeout(App.dimT);App.dimT=setTimeout(dim,15000)};
+$('#bEnd').onclick=async()=>{if(!await ask('Terminer la nuit et voir l\'analyse ?','Terminer'))return;clearInterval(App.timer);clearTimeout(App.dimT);
+  const n=await App.tr.stop();releaseAwake();$('#night').classList.remove('show');$('#dimmer').hidden=true;App.tr=null;openReport(n.id,'home')};
+$('#bStart').onclick=startNight;
+
+async function ring(reason){
+  App.ringing=true;clearInterval(App.timer);clearTimeout(App.dimT);
+  const n=await App.tr.stop();n.alarm.rang=Date.now();n.alarm.reason=reason;await DB.put('nights',n);App.night=n;App.tr=null;
+  $('#dimmer').hidden=true;$('#night').classList.remove('show');
+  $('#aClock').textContent=hm(Date.now());
+  $('#aMsg').textContent=reason==='leger'?'Bonjour ! Tu étais en sommeil léger, c\'est le bon moment.':'Bonjour ! C\'est l\'heure.';
+  $('#bSnooze').textContent='Snooze '+S.snooze+' min';$('#bSnooze').style.display='';
+  $('#alarm').classList.add('show');Alarm.play();
+}
+$('#bSnooze').onclick=()=>{Alarm.stop();const at=Date.now()+S.snooze*60000;$('#aMsg').textContent='Prochaine sonnerie à '+hm(at);$('#bSnooze').style.display='none';
+  clearTimeout(App.snoozeT);App.snoozeT=setTimeout(()=>{$('#aClock').textContent=hm(Date.now());$('#aMsg').textContent='Debout !';$('#bSnooze').style.display='';Alarm.play(20)},S.snooze*60000)};
+$('#bUp').onclick=()=>{Alarm.stop();clearTimeout(App.snoozeT);App.ringing=false;releaseAwake();$('#alarm').classList.remove('show');openReport(App.night.id,'home')};
+
+/* ---------- rapport ---------- */
+const scoreColor=s=>s==null?'#8c95b3':s>=75?'#4cd6a0':s>=55?'#f2b84b':'#ff6b6b';
+function scoreSVG(s){const r=34,c=2*Math.PI*r,v=clamp(s||0,0,100)/100;
+  return `<svg width="86" height="86" viewBox="0 0 86 86"><circle cx="43" cy="43" r="${r}" fill="none" stroke="#1e2645" stroke-width="9"/><circle cx="43" cy="43" r="${r}" fill="none" stroke="${scoreColor(s)}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${c*v} ${c}" transform="rotate(-90 43 43)"/><text x="43" y="50" text-anchor="middle" fill="#e8ecf8" font-size="22" font-weight="700">${s??'–'}</text></svg>`}
+async function openReport(id,back){App.backTo=back||'history';const n=await DB.get('nights',id);if(!n){toast('Nuit introuvable');return}
+  if(!n.analysis)finalizeNight(n);show('report');renderReport(n)}
+function renderReport(n){const a=n.analysis,c=n.counts||{},asl=Math.max(1,a.asleep);
+  const pctS=i=>Math.round(a.tot[i]/Math.max(1,a.st.length)*100);
+  const reason=n.alarm&&n.alarm.rang?(n.alarm.reason==='leger'?`Réveil intelligent à ${hm(n.alarm.rang)} (sommeil léger)`:`Réveil à ${hm(n.alarm.rang)}`):'Arrêt manuel';
+  const gapMin=Math.round((n.gaps||[]).reduce((s,g)=>s+(g[1]-g[0]),0)/60000);
+  const verdict=a.score>=75?'Bonne nuit':a.score>=55?'Nuit correcte':'Nuit difficile';
+  $('#rep').innerHTML=`
+  <h1 style="margin-bottom:4px">${dayLabel(n.start)} → ${dayLabel(n.end)}</h1>
+  <div class="mut small" style="margin-bottom:14px">${n.demo?'<span class="tag">démo</span> ':''}${n.status==='interrompue'?'<span class="tag">suivi interrompu</span> ':''}${reason}</div>
+  <div class="card"><div class="score">${scoreSVG(a.score)}<div><b style="font-size:19px">${verdict}</b><div class="mut small">${fmtDur(a.asleep)} de sommeil estimé · ${a.cycles} cycle${a.cycles>1?'s':''}</div><div class="mut small">Couché ${hm(n.start)} · endormi vers ${hm(n.start+a.onset*60000)} · levé ${hm(n.end)}</div></div></div></div>
+  <div class="card"><h2>Hypnogramme</h2><canvas id="cvH" height="210"></canvas>
+    <div class="legend">${STAGES.map(s=>`<span><i style="background:${s.c}"></i>${s.l}</span>`).join('')}<span><i style="background:#c77dff;opacity:.5"></i>Ronflement</span><span><i style="background:#ff9f6b;border-radius:50%"></i>Toux</span><span><i style="background:#4cd6a0;border-radius:50%"></i>Parole</span></div></div>
+  <div class="card"><h2>Phases</h2>${[3,2,1,0].map(i=>`<div class="phase"><span class="lab">${STAGES[i].l}</span><div class="bar"><div style="width:${pctS(i)}%;background:${STAGES[i].c}"></div></div><span class="val">${fmtDur(a.tot[i])} · ${pctS(i)} %</span></div>`).join('')}
+    <p class="mut small" style="margin:10px 0 0">Repères adultes : profond ~15-25 %, paradoxal ~20-25 % du sommeil. Estimation à partir des mouvements, à lire comme une tendance.</p></div>
+  <div class="card"><h2>Événements</h2><div class="kv">
+    <div><b>${c.mouvement||0}</b><span>mouvements · ${a.awak} réveil${a.awak>1?'s':''} probable${a.awak>1?'s':''}</span></div>
+    <div><b>${fmtDur(c.ronfMin||0)}</b><span>de ronflement · ${c.episodes||0} épisode${(c.episodes||0)>1?'s':''}</span></div>
+    <div><b>${c.toux||0}</b><span>toux</span></div>
+    <div><b>${c.parole||0}</b><span>paroles</span></div></div>
+    ${c.bruit?`<p class="mut small" style="margin:10px 0 0">${c.bruit} bruit${c.bruit>1?'s':''} extérieur${c.bruit>1?'s':''} long${c.bruit>1?'s':''} ignoré${c.bruit>1?'s':''} pour les phases.</p>`:''}</div>
+  <div class="card"><h2>Niveau sonore</h2><canvas id="cvN" height="110"></canvas></div>
+  <div class="card"><div class="row"><h2 style="margin:0">Moments les plus bruyants</h2><button class="btn sm danger" id="bClipsDel" style="display:none">Tout effacer</button></div><div id="clips" class="mut small" style="margin-top:8px">Chargement…</div></div>
+  ${gapMin>0?`<div class="warn">Le micro s'est arrêté environ ${gapMin} min pendant la nuit (écran verrouillé ou appli en arrière-plan). L'analyse de ces moments est incomplète.</div>`:''}
+  <button class="btn danger" id="bDelNight" style="margin-top:14px">Supprimer cette nuit</button>`;
+  requestAnimationFrame(()=>{drawHypno($('#cvH'),n);drawNoise($('#cvN'),n)});
+  renderClips(n);
+  $('#bDelNight').onclick=async()=>{if(!await ask('Supprimer cette nuit et ses extraits audio ?','Supprimer'))return;for(const c of await DB.clipsOf(n.id))await DB.del('clips',c.id);await DB.del('nights',n.id);toast('Nuit supprimée');show('history')};
+}
+function setupCanvas(cv){const dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=+cv.getAttribute('height');cv.width=w*dpr;cv.height=h*dpr;cv.style.height=h+'px';const g=cv.getContext('2d');g.scale(dpr,dpr);return[g,w,h]}
+function timeAxis(g,n,w,y,x0){const N=n.analysis.st.length,start=n.start;g.fillStyle='#8c95b3';g.font='11px -apple-system,sans-serif';g.textAlign='center';
+  const first=new Date(start);first.setMinutes(0,0,0);let t=first.getTime()+3600000;const step=N>600?7200000:3600000;
+  for(;t<start+N*60000;t+=3600000){const d=new Date(t);if(step>3600000&&d.getHours()%2)continue;const x=x0+(t-start)/60000/N*(w-x0);g.fillText(pad(d.getHours())+'h',x,y)}}
+function drawHypno(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),a=n.analysis,N=a.st.length,x0=0,top=6,ch=150,rowH=ch/4,x=i=>x0+i/N*(w-x0);
+  const lvl={0:0,2:1,1:2,3:3};
+  for(let r=0;r<4;r++){g.fillStyle=r%2?'#151b30':'#18203a';g.fillRect(x0,top+r*rowH,w-x0,rowH)}
+  for(let i=0;i<N;i++){const s=a.st[i],L=lvl[s];g.fillStyle=STAGES[s].c;g.fillRect(x(i),top+L*rowH,Math.max(1,x(i+1)-x(i))+0.5,ch-L*rowH)}
+  g.fillStyle='rgba(232,236,248,.55)';g.font='10px -apple-system,sans-serif';g.textAlign='left';['Éveil','Paradoxal','Léger','Profond'].forEach((l,r)=>g.fillText(l,4,top+r*rowH+12));
+  const ey=top+ch+12;
+  (n.snoreEps||[]).forEach(e=>{const i0=(e.t-n.start)/60000;g.fillStyle='rgba(199,125,255,.6)';g.fillRect(x(i0),ey-4,Math.max(3,x(i0+e.d/60)-x(i0)),8)});
+  n.events.forEach(e=>{if(e.type!=='toux'&&e.type!=='parole')return;const i=(e.t-n.start)/60000;g.fillStyle=e.type==='toux'?'#ff9f6b':'#4cd6a0';g.beginPath();g.arc(x(i),ey,3.5,0,7);g.fill()});
+  if(n.alarm&&n.alarm.on&&n.alarm.smart){const i0=(n.alarm.winStart-n.start)/60000,i1=(n.alarm.wake-n.start)/60000;if(i0<N){g.strokeStyle='rgba(242,184,75,.8)';g.setLineDash([3,3]);g.strokeRect(x(i0),top,Math.min(x(i1),w)-x(i0),ch);g.setLineDash([])}}
+  timeAxis(g,n,w,h-6,x0)}
+function drawNoise(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),d=n.m.db,N=d.length,v=d.map((x,i)=>n.m.dbn[i]?x:null),vals=v.filter(x=>x!==null);if(!vals.length)return;
+  const lo=Math.min(...vals),hi=Math.max(lo+10,Math.max(...vals)),top=6,ch=h-26,y=x=>top+ch-(x-lo)/(hi-lo)*ch;
+  g.strokeStyle='#8aa4ff';g.lineWidth=1.5;g.beginPath();let st=false;v.forEach((x,i)=>{if(x===null){st=false;return}const px=i/N*w;st?g.lineTo(px,y(x)):g.moveTo(px,y(x));st=true});g.stroke();
+  g.fillStyle='#8c95b3';g.font='10px -apple-system,sans-serif';g.textAlign='left';g.fillText(Math.round(hi)+' dB',2,top+9);g.fillText(Math.round(lo)+' dB',2,top+ch-2);
+  timeAxis(g,n,w,h-4,0)}
+async function renderClips(n){const box=$('#clips'),cl=(await DB.clipsOf(n.id)).sort((a,b)=>a.t-b.t);
+  (App.urls||[]).forEach(u=>URL.revokeObjectURL(u));App.urls=[];
+  if(!cl.length){box.innerHTML='Aucun extrait gardé pour cette nuit.';$('#bClipsDel').style.display='none';return}
+  $('#bClipsDel').style.display='';
+  box.innerHTML=cl.map(c=>{const u=URL.createObjectURL(new Blob([c.wav],{type:'audio/wav'}));App.urls.push(u);const T=TYPES[c.type]||TYPES.bruit;
+    return `<div class="clip" data-id="${esc(c.id)}"><div class="row"><span style="color:var(--txt)">${T.i} <b>${T.l}</b> · ${hm(c.t)} <span class="mut">· ${Math.round(c.dur)} s</span></span><button class="x">Effacer</button></div><audio controls preload="metadata" src="${u}"></audio></div>`}).join('');
+  $$('#clips .x').forEach(b=>b.onclick=async()=>{const el=b.closest('.clip');await DB.del('clips',el.dataset.id);el.remove();if(!$$('#clips .clip').length)renderClips(n)});
+  $('#bClipsDel').onclick=async()=>{if(!await ask('Effacer tous les extraits audio de cette nuit ?','Effacer'))return;for(const c of cl)await DB.del('clips',c.id);renderClips(n)}}
+
+/* ---------- historique ---------- */
+async function renderHistory(){const ns=(await DB.all('nights')).filter(n=>n.status!=='en_cours').sort((a,b)=>b.start-a.start),box=$('#histList');
+  if(!ns.length){box.innerHTML='<div class="empty">Aucune nuit enregistrée pour l\'instant.<br><br><button class="btn sec sm" id="bDemo2">Voir une nuit de démo</button></div>';$('#bDemo2').onclick=makeDemo;$('#weekCard').innerHTML='';return}
+  box.innerHTML=ns.map(n=>{const a=n.analysis||{tot:[0,0,0,0],st:[1]},N=Math.max(1,a.st.length);
+    return `<div class="hist" data-id="${n.id}"><div class="sc" style="color:${scoreColor(a.score)}">${a.score??'–'}</div><div style="flex:1"><div class="row"><b>${dayLabel(n.end||n.start)}</b><span class="mut small">${fmtDur(a.asleep||0)}</span></div>
+    <div class="mini">${[3,2,1,0].map(i=>`<div style="width:${a.tot[i]/N*100}%;background:${STAGES[i].c}"></div>`).join('')}</div>
+    <div class="mut small">${hm(n.start)} → ${hm(n.end||n.start)}${n.counts&&n.counts.ronfMin>=1?' · ronflements '+fmtDur(n.counts.ronfMin):''}${n.demo?' · démo':''}</div></div></div>`}).join('');
+  $$('.hist[data-id]').forEach(el=>el.onclick=()=>openReport(el.dataset.id,'history'));
+  const wk=ns.filter(n=>n.start>Date.now()-7*86400000&&!n.demo&&n.analysis);
+  $('#weekCard').innerHTML=wk.length?`<div class="card"><h2>7 derniers jours</h2><div class="kv"><div><b>${fmtDur(wk.reduce((s,n)=>s+n.analysis.asleep,0)/wk.length)}</b><span>de sommeil en moyenne</span></div><div><b>${Math.round(wk.reduce((s,n)=>s+n.analysis.score,0)/wk.length)}</b><span>score moyen (${wk.length} nuit${wk.length>1?'s':''})</span></div></div></div>`:''}
+
+/* ---------- réglages ---------- */
+function syncSettings(){$$('#sens button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.sens));$$('#sound button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.sound));
+  $('#maxClips').value=S.maxClips;$('#ramp').value=S.ramp;$('#snooze').value=S.snooze;$('#persoRow').style.display=S.sound==='perso'?'':'none';
+  DB.get('files','alarm').then(f=>$('#persoName').textContent=f?'Fichier : '+f.name:'Aucun fichier choisi').catch(()=>{})}
+$$('#sens button').forEach(b=>b.onclick=()=>{S.sens=b.dataset.v;saveS();syncSettings()});
+$$('#sound button').forEach(b=>b.onclick=()=>{S.sound=b.dataset.v;saveS();syncSettings()});
+$('#maxClips').onchange=e=>{S.maxClips=+e.target.value;saveS()};$('#ramp').onchange=e=>{S.ramp=+e.target.value;saveS()};$('#snooze').onchange=e=>{S.snooze=+e.target.value;saveS()};
+$('#persoFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;await DB.put('files',{key:'alarm',name:f.name,data:await f.arrayBuffer()});syncSettings();toast('Sonnerie enregistrée')};
+$('#bTest').onclick=async()=>{await ensureCtx();Alarm.play(2);setTimeout(()=>Alarm.stop(),5000)};
+$('#bExport').onclick=async()=>{const ns=await DB.all('nights'),b=new Blob([JSON.stringify(ns)],{type:'application/json'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download='mon-sommeil-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove()};
+$('#bWipe').onclick=async()=>{if(!await ask('Effacer toutes les nuits et tous les extraits audio ? C\'est définitif.','Tout effacer'))return;await DB.clearAll();toast('Données effacées')};
+$('#bDemo').onclick=makeDemo;
+
+/* ---------- nuit de démonstration ---------- */
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+async function makeDemo(){
+  const r=rng(Date.now()&0xffff),end=new Date();end.setHours(7,32,0,0);if(end.getTime()>Date.now())end.setDate(end.getDate()-1);
+  const E=end.getTime(),start=E-(8*60+12)*60000,n=newNight(start),N=Math.round((E-start)/60000);n.demo=true;n.floor=-62;n.sens='moyenne';ensureMin(n,N-1);
+  const ev=(min,type,d,p)=>addEvent(n,{t:start+min*60000,type,d,p});
+  for(let i=0;i<13;i++){const k=1+Math.floor(r()*3);for(let j=0;j<k;j++)ev(i+r(),'mouvement',1+r()*3,10+r()*12)}
+  let t0=13,c=0;const cyc=[88,96,92,101,86];
+  while(t0<N){const len=Math.min(cyc[c]||95,N-t0);
+    for(let i=0;i<len;i++){const ph=i/len;let p=ph>0.88?0.85:ph>0.7?0.12:ph<0.1?0.2:0.03;if(c>=3&&ph>0.55&&ph<=0.88)p=0.1;
+      if(r()<p)ev(t0+i+r(),'mouvement',0.5+r()*2.5,9+r()*14);if(ph>0.92&&r()<0.5)ev(t0+i+r(),'mouvement',1+r()*2,12+r()*10)}
+    if(c<3){const s0=t0+Math.round(len*0.28),s1=t0+Math.round(len*(c===1?0.6:0.48));for(let i=s0;i<s1;i++)n.m.snore[i]+=12+r()*10;n.snoreEps.push({t:start+s0*60000,d:(s1-s0)*60,n:(s1-s0)*14,p:+(14+r()*6).toFixed(1)})}
+    t0+=len;c++}
+  ev(142,'toux',0.6,22);ev(142.1,'toux',0.8,24);ev(301,'parole',3.4,15);ev(455,'toux',0.5,19);
+  for(let i=N-3;i<N;i++)ev(i+0.3,'mouvement',2,16);
+  for(let i=0;i<N;i++){n.m.db[i]=-62+Math.min(8,n.m.act[i]*2)+(n.m.snore[i]?7:0)+r()*1.5;n.m.dbn[i]=1}
+  n.end=E;n.status='terminee';n.alarm={on:true,wake:E+13*60000,winStart:E-17*60000,smart:true,rang:E,reason:'leger'};
+  finalizeNight(n);await DB.put('nights',n);
+  // deux extraits synthétiques pour tester le lecteur
+  const R=16000,mk=(sec,fn)=>{const f=new Float32Array(R*sec);let b=0;for(let i=0;i<f.length;i++){const w=r()*2-1;b=(b+0.02*w)/1.02;f[i]=fn(i/R,w,b)}return wavFromFloat(f,R)};
+  const snore=mk(14,(t,w,b)=>{const ph=(t%3.8)/3.8,env=ph<0.38?Math.sin(Math.PI*ph/0.38):0;return env*(b*6+0.25*Math.sin(2*Math.PI*85*t)*(0.6+0.4*Math.sin(2*Math.PI*7*t)))+w*0.004});
+  const cough=mk(5,(t,w)=>{let a=0;[0.8,1.25,1.7].forEach(s=>{const d=t-s;if(d>=0)a+=Math.exp(-d*14)});return w*a*0.8+w*0.004});
+  await DB.put('clips',{id:'demo_s_'+n.id,nightId:n.id,t:start+40*60000,type:'ronflement',score:20,dur:14,wav:snore});
+  await DB.put('clips',{id:'demo_c_'+n.id,nightId:n.id,t:start+142*60000-3000,type:'toux',score:26,dur:5,wav:cough});
+  toast('Nuit de démo créée');openReport(n.id,'history');
+}
+
+/* ---------- démarrage ---------- */
+(async()=>{await DB.open();
+  // récupère une nuit restée « en cours » (page fermée, batterie vide…)
+  try{for(const n of await DB.all('nights')){if(n.status==='en_cours'){n.end=n.start+Math.max(1,n.m.act.length)*60000;n.status='interrompue';finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
+  syncSettings();renderHome();
+  try{const c=document.createElement('canvas');c.width=c.height=180;const g=c.getContext('2d');g.fillStyle='#0b1020';g.fillRect(0,0,180,180);g.fillStyle='#8aa4ff';g.beginPath();g.arc(95,85,52,0,7);g.fill();g.fillStyle='#0b1020';g.beginPath();g.arc(120,68,46,0,7);g.fill();
+    const l=document.createElement('link');l.rel='apple-touch-icon';l.href=c.toDataURL();document.head.appendChild(l);const l2=document.createElement('link');l2.rel='icon';l2.href=l.href;document.head.appendChild(l2)}catch(e){}
+  setInterval(()=>{if(App.cur==='home'&&!App.tr)syncHome()},30000);
+})();
+window.addEventListener('beforeunload',e=>{if(App.tr&&App.tr.running){e.preventDefault();e.returnValue=''}});
+</script>
+</body>
+</html>
