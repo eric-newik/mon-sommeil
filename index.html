@@ -159,10 +159,13 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
     <details><summary>Phases de sommeil</summary>
       <p class="mut small">Comme Sleep Cycle, l'app se base sur tes mouvements : beaucoup de mouvements = éveil ou sommeil léger, immobilité prolongée = sommeil profond. Elle repère les pics d'agitation qui marquent la fin de chaque cycle (souvent 80 à 110 min) et place le sommeil paradoxal en fin de cycle, plus long en fin de nuit.</p>
       <p class="mut small">C'est une <b>estimation</b> : seule une polysomnographie (avec mesure de l'activité du cerveau) mesure vraiment les phases. Utile pour suivre des tendances, pas pour poser un diagnostic.</p></details>
+    <details><summary>Pauses respiratoires</summary>
+      <p class="mut small">Pendant un ronflement, l'app repère les silences complets d'au moins 10 secondes suivis d'une reprise bruyante (inspiration forte, ronflement plus fort) : c'est le schéma typique d'une apnée obstructive. Elle compte ces pauses par heure de sommeil et garde un extrait pour que tu puisses écouter.</p>
+      <p class="mut small">Ce n'est qu'un dépistage indicatif : elle ne voit pas les apnées sans ronflement ni les hypopnées (respiration seulement réduite). Si l'indice dépasse souvent 5 par heure, ou en cas de fatigue dans la journée, de maux de tête au réveil ou de pauses vues par quelqu'un, parles-en à un médecin.</p></details>
     <details><summary>Réveil intelligent</summary>
       <p class="mut small">Pendant la fenêtre choisie, dès qu'un mouvement net est détecté (signe de sommeil léger), la sonnerie démarre doucement. Sinon elle sonne à l'heure prévue.</p></details>
   </div>
-  <p class="mut small" style="text-align:center">Mon Sommeil · version 1.1</p>
+  <p class="mut small" style="text-align:center">Mon Sommeil · version 1.3</p>
 </section>
 
 <nav class="tabs" id="tabs">
@@ -213,7 +216,7 @@ function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.style.displa
 function ask(msg,ok='Confirmer'){return new Promise(res=>{$('#mText').textContent=msg;$('#mOk').textContent=ok;$('#modal').classList.add('show');
   const done=v=>{$('#modal').classList.remove('show');$('#mOk').onclick=$('#mNo').onclick=null;res(v)};$('#mOk').onclick=()=>done(true);$('#mNo').onclick=()=>done(false)})}
 
-const TYPES={mouvement:{l:'Mouvement',i:'🔄'},ronflement:{l:'Ronflement',i:'😴'},toux:{l:'Toux',i:'😷'},parole:{l:'Parole',i:'💬'},bruit:{l:'Bruit',i:'🔊'}};
+const TYPES={mouvement:{l:'Mouvement',i:'🔄'},ronflement:{l:'Ronflement',i:'😴'},toux:{l:'Toux',i:'😷'},parole:{l:'Parole',i:'💬'},bruit:{l:'Bruit',i:'🔊'},pause:{l:'Pause respiratoire ?',i:'⏸️'}};
 const STAGES=[{l:'Éveil',c:'#f2b84b'},{l:'Léger',c:'#5ec8f2'},{l:'Paradoxal',c:'#c77dff'},{l:'Profond',c:'#3d5afe'}];
 
 /* ---------- réglages ---------- */
@@ -237,19 +240,24 @@ const DB={db:null,mem:{nights:new Map(),clips:new Map(),files:new Map()},
 };
 
 /* ---------- modèle d'une nuit ---------- */
-function newNight(start){return{id:'n'+start,start,end:null,status:'en_cours',m:{act:[],db:[],dbn:[],mov:[],cough:[],talk:[],snore:[],noise:[]},events:[],snoreEps:[],gaps:[],floor:null,alarm:null,analysis:null,demo:false}}
+function newNight(start){return{id:'n'+start,start,end:null,status:'en_cours',m:{act:[],db:[],dbn:[],mov:[],cough:[],talk:[],snore:[],noise:[]},events:[],snoreEps:[],apneas:[],snores:[],gaps:[],floor:null,alarm:null,analysis:null,demo:false}}
 function ensureMin(n,i){const m=n.m;while(m.act.length<=i){for(const k in m)m[k].push(0)}}
-function addEvent(n,e){
-  const i=Math.max(0,Math.floor((e.t-n.start)/60000));ensureMin(n,i);const m=n.m;
+/* poids d'un événement pour l'activité (v1.2 : les petits bruits brefs, respiration, clics, comptent très peu) */
+function evRule(n,e){const thr=SENS[n.sens]||8;
   switch(e.type){
-    case 'mouvement':m.act[i]+=1+Math.min(2,Math.max(0,e.p)/15);m.mov[i]++;break;
-    case 'toux':m.act[i]+=0.7;m.cough[i]++;break;
-    case 'parole':m.act[i]+=0.4;m.talk[i]++;break;
-    case 'bruit':m.noise[i]++;break;
-    case 'ronflement':m.snore[i]+=e.d;return;
-  }
-  n.events.push({t:Math.round(e.t),type:e.type,d:+e.d.toFixed(1),p:+e.p.toFixed(1)});
+    case 'mouvement':{const big=e.d>=0.6||e.p>=thr+22;return big?{act:1+Math.min(2,Math.max(0,e.p-thr)/15),k:'mov'}:{act:0.02,k:null}}
+    case 'toux':return e.p>=thr+18?{act:0.7,k:'cough'}:{act:0.02,k:null};
+    case 'parole':return e.d>=1&&e.p>=thr+14?{act:0.4,k:'talk'}:{act:0.02,k:null};
+    case 'bruit':return{act:0,k:'noise'};
+  }return{act:0,k:null}}
+function applyEv(n,e){const i=Math.max(0,Math.floor((e.t-n.start)/60000));ensureMin(n,i);const m=n.m,r=evRule(n,e);m.act[i]+=r.act;if(r.k)m[r.k][i]++}
+function addEvent(n,e){
+  if(e.type==='ronflement'){const i=Math.max(0,Math.floor((e.t-n.start)/60000));ensureMin(n,i);n.m.snore[i]+=e.d;return}
+  const ev={t:Math.round(e.t),type:e.type,d:+e.d.toFixed(1),p:+e.p.toFixed(1)};n.events.push(ev);applyEv(n,ev);
 }
+/* recalcule l'activité à partir des événements (permet de réanalyser les anciennes nuits avec les règles actuelles) */
+function rebuildAct(n){const m=n.m;for(const k of ['act','mov','cough','talk','noise'])for(let i=0;i<m[k].length;i++)m[k][i]=0;n.events.forEach(e=>applyEv(n,e))}
+const significant=(n,e)=>!!evRule(n,e).k&&e.type!=='bruit';
 
 /* ---------- estimation des phases ---------- */
 function analyze(n){
@@ -259,7 +267,9 @@ function analyze(n){
   const so=[...s].sort((a,b)=>a-b),pct=p=>so[Math.min(N-1,Math.floor(p*(N-1)))];
   const ref=Math.max(pct(0.85),0.35);
   // endormissement : 10 minutes calmes
-  let onset=N;for(let i=0;i+10<=N;i++){let t=0;for(let j=i;j<i+10;j++)t+=act[j];if(t<2.5){onset=i;break}}
+  const R10=[];for(let i=0;i+10<=N;i++){let t=0;for(let j=i;j<i+10;j++)t+=act[j];R10.push(t)}
+  const r10s=[...R10].sort((a,b)=>a-b),onThr=Math.max(2.5,(r10s[Math.floor(r10s.length*0.25)]||0)*1.1);
+  let onset=N;for(let i=0;i<R10.length;i++){if(R10[i]<=onThr){onset=i;break}}
   if(N<10)onset=0;
   // fins de cycles = pics d'agitation espacés d'au moins 60 min
   const peaks=[];
@@ -268,12 +278,16 @@ function analyze(n){
   let b=[onset,...peaks,N];const b2=[b[0]];
   for(let k=1;k<b.length;k++){const a=b2[b2.length-1],z=b[k],len=z-a;if(len>130){const parts=Math.round(len/90);for(let q=1;q<parts;q++)b2.push(Math.round(a+len*q/parts))}if(z>b2[b2.length-1])b2.push(z)}
   b=b2;
+  const sn=n.m.snore||[];
   const st=new Array(N).fill(1);
   for(let c=0;c<b.length-1;c++){const a=b[c],z=b[c+1],last=c===b.length-2,len=Math.max(last?90:60,z-a);
     const deepThr=c<2?0.22:(c<3?0.14:0.07),remStart=c===0?0.82:(c===1?0.72:0.62);
-    for(let i=a;i<z;i++){const ph=(i-a)/len,L=s[i]/ref;
+    for(let i=a;i<z;i++){const ph=(i-a)/len,L=s[i]/ref*(sn[i]>=10&&act[i]<1?0.6:1);
       if(L<deepThr&&ph>0.08&&ph<0.65)st[i]=3;else if(ph>=remStart&&L<0.85)st[i]=2;else st[i]=1}}
-  for(let i=0;i<N;i++){if(i<onset)st[i]=0;else if(act[i]>=5||(act[i]>=3&&s[i]>1.6*ref))st[i]=0}
+  const aso=[...act].sort((a,b)=>a-b),q=p=>aso[Math.min(N-1,Math.floor(p*(N-1)))],awHi=Math.max(5,q(0.93)),awMid=Math.max(3,q(0.8));
+  for(let i=0;i<N;i++){if(i<onset)st[i]=0;else if((act[i]>=awHi||(act[i]>=awMid&&s[i]>1.6*ref))&&!(sn[i]>=10&&act[i]<8))st[i]=0}
+  // micro-éveils : une minute isolée d'agitation modérée reste du sommeil léger
+  for(let i=Math.max(1,onset+1);i<N-1;i++){if(st[i]===0&&st[i-1]!==0&&st[i+1]!==0&&act[i]<8)st[i]=1}
   // lissage des épisodes isolés d'une minute (hors éveil)
   for(let i=1;i<N-1;i++){if(st[i]!==0&&st[i-1]===st[i+1]&&st[i]!==st[i-1]&&st[i-1]!==0)st[i]=st[i-1]}
   // fin de nuit : éveil final
@@ -286,9 +300,9 @@ function analyze(n){
 }
 function finalizeNight(n){
   const dur=Math.max(1,Math.ceil(((n.end||Date.now())-n.start)/60000));ensureMin(n,dur-1);
-  n.analysis=analyze(n);
-  const c={mouvement:0,toux:0,parole:0,bruit:0};n.events.forEach(e=>{if(c[e.type]!==undefined)c[e.type]++});
-  c.ronfMin=n.m.snore.reduce((a,v)=>a+v,0)/60;c.episodes=n.snoreEps.length;n.counts=c;
+  rebuildAct(n);n.analysis=analyze(n);n.rules='1.2';
+  const c={mouvement:0,toux:0,parole:0,bruit:0};n.events.forEach(e=>{if(c[e.type]!==undefined&&(e.type==='bruit'||significant(n,e)))c[e.type]++});
+  c.ronfMin=n.m.snore.reduce((a,v)=>a+v,0)/60;c.episodes=n.snoreEps.length;c.pauses=(n.apneas||[]).length;n.counts=c;
 }
 
 /* ---------- WAV ---------- */
@@ -319,7 +333,7 @@ class Tracker{
     this.dec=Math.max(1,Math.round(sr/16000));this.rate=sr/this.dec;this.ringLen=Math.ceil(this.rate*75);this.ring=new Float32Array(this.ringLen);this.total=0;
     this.thr=SENS[S.sens]||8;this.maxClips=+S.maxClips;
     const n=this.night=newNight(Date.now());n.sens=S.sens;n.alarm=opts.alarm;n.rate=this.rate;
-    this.floor=null;this.init=[];this.ev=null;this.pend=[];this.ep=null;this.clipQ=[];this.clips=[];
+    this.floor=null;this.init=[];this.ev=null;this.pend=[];this.lastSnd=0;this.lastSnoreEnd=0;this.recentSn=[];this.ep=null;this.clipQ=[];this.clips=[];
     this.lastProc=Date.now();this.lastSave=Date.now();this.lastTick=0;this.level=-100;this.running=true;
     this.proc.onaudioprocess=e=>{try{this.process(e)}catch(err){console.error(err)}};
     await DB.put('nights',n);
@@ -352,7 +366,9 @@ class Tracker{
   }
   endEvent(){
     const ev=this.ev;this.ev=null;const fr=ev.fr.slice(0,ev.act),dur=fr.length*this.fd;
+    const prevSnd=this.lastSnd;this.lastSnd=ev.t+dur*1000;
     if(dur<0.12)return;
+    this.checkPause(ev,prevSnd);
     const tot=ev.lp+ev.mp+ev.hp+1e-20,fl=ev.lp/tot,fm=ev.mp/tot,fh=ev.hp/tot;
     let pi=0;while(pi<fr.length-1&&fr[pi]<ev.peak-6)pi++;const attack=pi*this.fd;
     let syl=0,mode=1,ext=-1e9;
@@ -362,16 +378,28 @@ class Tracker{
     if(dur>=11)type='bruit';
     else if(dur>=0.8&&fm>=0.45&&syl>=3&&syl/dur>=1.3&&fl<0.4)type='parole';
     else if(attack<=0.1&&ev.peak>=this.thr+9&&fm+fh>=0.55&&(dur<=0.8||(dur<=2.5&&syl<=3)))type='toux';
-    else if(dur>=0.4&&dur<=4&&fl>=0.35&&fh<0.2)type='snore?';
+    else if(dur>=0.4&&dur<=4&&fl>=0.35&&fh<0.2&&ev.peak>=this.thr+10)type='snore?';
     else type='mouvement';
     const e={t:ev.t,d:dur,p:ev.peak,type,sIdx:ev.sIdx,eIdx:ev.eIdx};
     if(type==='bruit'){const so=[...fr].sort((a,b)=>a-b);this.floor+=Math.max(0,so[Math.floor(so.length/2)]-2)}
     if(type==='snore?')this.snoreCand(e);else this.commit(e);
   }
+  checkPause(ev,prevSnd){
+    // pause suspecte : on ronflait juste avant, puis silence total ≥ 10 s, puis reprise forte
+    if(!prevSnd)return;const gap=(ev.t-prevSnd)/1000;if(gap<10||gap>90)return;
+    if(prevSnd-this.lastSnoreEnd>4000)return;
+    const ctx=this.recentSn.filter(x=>prevSnd-x.t<=60000&&x.t<=prevSnd);if(ctx.length<3)return;
+    const med=ctx.map(x=>x.p).sort((a,b)=>a-b)[Math.floor(ctx.length/2)];
+    if(ev.peak<Math.max(this.thr+14,med))return;
+    const a={t:Math.round(prevSnd),d:+gap.toFixed(1),p:+ev.peak.toFixed(1)};this.night.apneas.push(a);
+    this.onEvent&&this.onEvent({type:'pause'});
+    if(this.maxClips){const R=this.rate,to=ev.sIdx+Math.round(5*R),from=Math.max(ev.sIdx-Math.round(Math.min(gap+4,22)*R),to-Math.round(30*R));
+      this.clipQ.push({from,to,score:ev.peak+12+gap/3,type:'pause',t:prevSnd-4000})}
+  }
   commit(e){addEvent(this.night,e);this.onEvent&&this.onEvent(e);this.considerClip(e)}
   snoreCand(e){
     if(this.ep&&e.t-this.ep.last<=15000){this.addSnore(e);return}
-    this.pend.push(e);
+    this.pend.push(e);this.lastSnoreEnd=Math.max(this.lastSnoreEnd,e.t+e.d*1000);this.recentSn.push({t:e.t,p:e.p});if(this.recentSn.length>12)this.recentSn.shift();
     const rec=this.pend.filter(c=>e.t-c.t<=45000),k=rec.length;
     if(k>=3){const i1=(rec[k-1].t-rec[k-2].t)/1000,i2=(rec[k-2].t-rec[k-3].t)/1000;
       if(i1>=1.8&&i1<=10&&i2>=1.8&&i2<=10&&Math.abs(i1-i2)<=Math.max(i1,i2)*0.6){
@@ -379,7 +407,7 @@ class Tracker{
         rec.forEach(c=>this.addSnore(c));
         this.considerClip({type:'ronflement',p:Math.max(...rec.map(c=>c.p)),sIdx:rec[0].sIdx,eIdx:e.eIdx,t:rec[0].t})}}
   }
-  addSnore(e){const ep=this.ep;ep.last=e.t+e.d*1000;ep.n++;ep.p=Math.max(ep.p,e.p);const r={...e,type:'ronflement'};addEvent(this.night,r);this.onEvent&&this.onEvent(r)}
+  addSnore(e){const ep=this.ep;ep.last=e.t+e.d*1000;this.lastSnoreEnd=Math.max(this.lastSnoreEnd,ep.last);this.recentSn.push({t:e.t,p:e.p});if(this.recentSn.length>12)this.recentSn.shift();this.night.snores.push([Math.round(e.t),+e.d.toFixed(1),+e.p.toFixed(1)]);ep.n++;ep.p=Math.max(ep.p,e.p);const r={...e,type:'ronflement'};addEvent(this.night,r);this.onEvent&&this.onEvent(r)}
   closeEp(){const ep=this.ep;this.ep=null;this.night.snoreEps.push({t:ep.t,d:Math.round((ep.last-ep.t)/1000),n:ep.n,p:+ep.p.toFixed(1)});this.onEvent&&this.onEvent({type:'episode'})}
   considerClip(e){
     if(!this.maxClips)return;
@@ -476,7 +504,7 @@ async function keepAwake(){try{if('wakeLock' in navigator){App.wl=await navigato
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&(App.tr&&App.tr.running||App.ringing))keepAwake()});
 function releaseAwake(){try{App.wl&&App.wl.release()}catch(e){}App.wl=null}
 function onLive(e){const n=App.tr.night,c=n.counts||{};
-  const cnt=t=>n.events.filter(x=>x.type===t).length;
+  const cnt=t=>n.events.filter(x=>x.type===t&&significant(n,x)).length;
   $('#cMov').textContent=cnt('mouvement');$('#cCough').textContent=cnt('toux');$('#cTalk').textContent=cnt('parole');
   $('#cSnore').textContent=n.snoreEps.length+(App.tr.ep?1:0);
   if(TYPES[e.type])$('#nLast').textContent=`Dernier : ${TYPES[e.type].l.toLowerCase()} à ${hm(Date.now())}`}
@@ -514,6 +542,14 @@ function scoreSVG(s){const r=34,c=2*Math.PI*r,v=clamp(s||0,0,100)/100;
   return `<svg width="86" height="86" viewBox="0 0 86 86"><circle cx="43" cy="43" r="${r}" fill="none" stroke="#1e2645" stroke-width="9"/><circle cx="43" cy="43" r="${r}" fill="none" stroke="${scoreColor(s)}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${c*v} ${c}" transform="rotate(-90 43 43)"/><text x="43" y="50" text-anchor="middle" fill="#e8ecf8" font-size="22" font-weight="700">${s??'–'}</text></svg>`}
 async function openReport(id,back){App.backTo=back||'history';const n=await DB.get('nights',id);if(!n){toast('Nuit introuvable');return}
   if(!n.analysis)finalizeNight(n);show('report');renderReport(n)}
+function respCard(n){const ap=n.apneas||[],a=n.analysis,h=Math.max(0.5,a.asleep/60),idx=ap.length/h;
+  if(!n.snores&&!ap.length)return `<div class="card"><h2>Respiration</h2><p class="mut small" style="margin:0">Détection des pauses respiratoires disponible à partir des nuits enregistrées avec la version 1.3.</p></div>`;
+  const lvl=idx<5?['#4cd6a0','Rien de notable cette nuit.']:idx<15?['#f2b84b','Quelques pauses : à surveiller sur plusieurs nuits.']:['#ff6b6b','Pauses fréquentes : si ça se répète, parles-en à ton médecin.'];
+  const longest=ap.reduce((m,x)=>Math.max(m,x.d),0);
+  return `<div class="card"><h2>Respiration</h2><div class="kv"><div><b style="color:${lvl[0]}">${ap.length}</b><span>pause${ap.length>1?'s':''} suspecte${ap.length>1?'s':''} · ${idx.toFixed(1)} / h</span></div><div><b>${longest?Math.round(longest)+' s':'–'}</b><span>pause la plus longue</span></div></div>
+  <p class="small" style="margin:10px 0 4px">${lvl[1]}</p>
+  ${ap.length?`<p class="mut small" style="margin:4px 0">Heures : ${ap.slice(0,12).map(x=>hm(x.t)).join(', ')}${ap.length>12?'…':''}</p>`:''}
+  <p class="mut small" style="margin:6px 0 0">Repère : un silence d'au moins 10 s pendant un ronflement, suivi d'une reprise bruyante. C'est un <b>indice</b>, pas un diagnostic : seul un examen du sommeil (polygraphie ou polysomnographie) peut confirmer une apnée. Une pause peut aussi venir d'un changement de position.</p></div>`}
 function renderReport(n){const a=n.analysis,c=n.counts||{},asl=Math.max(1,a.asleep);
   const pctS=i=>Math.round(a.tot[i]/Math.max(1,a.st.length)*100);
   const reason=n.alarm&&n.alarm.rang?(n.alarm.reason==='leger'?`Réveil intelligent à ${hm(n.alarm.rang)} (sommeil léger)`:`Réveil à ${hm(n.alarm.rang)}`):'Arrêt manuel';
@@ -524,7 +560,7 @@ function renderReport(n){const a=n.analysis,c=n.counts||{},asl=Math.max(1,a.asle
   <div class="mut small" style="margin-bottom:14px">${n.demo?'<span class="tag">démo</span> ':''}${n.status==='interrompue'?'<span class="tag">suivi interrompu</span> ':''}${reason}</div>
   <div class="card"><div class="score">${scoreSVG(a.score)}<div><b style="font-size:19px">${verdict}</b><div class="mut small">${fmtDur(a.asleep)} de sommeil estimé · ${a.cycles} cycle${a.cycles>1?'s':''}</div><div class="mut small">Couché ${hm(n.start)} · endormi vers ${hm(n.start+a.onset*60000)} · levé ${hm(n.end)}</div></div></div></div>
   <div class="card"><h2>Hypnogramme</h2><canvas id="cvH" height="210"></canvas>
-    <div class="legend">${STAGES.map(s=>`<span><i style="background:${s.c}"></i>${s.l}</span>`).join('')}<span><i style="background:#c77dff;opacity:.5"></i>Ronflement</span><span><i style="background:#ff9f6b;border-radius:50%"></i>Toux</span><span><i style="background:#4cd6a0;border-radius:50%"></i>Parole</span></div></div>
+    <div class="legend">${STAGES.map(s=>`<span><i style="background:${s.c}"></i>${s.l}</span>`).join('')}<span><i style="background:#c77dff;opacity:.5"></i>Ronflement</span><span><i style="background:#ff9f6b;border-radius:50%"></i>Toux</span><span><i style="background:#4cd6a0;border-radius:50%"></i>Parole</span><span><i style="background:#ff6b6b"></i>Pause resp. ?</span></div></div>
   <div class="card"><h2>Phases</h2>${[3,2,1,0].map(i=>`<div class="phase"><span class="lab">${STAGES[i].l}</span><div class="bar"><div style="width:${pctS(i)}%;background:${STAGES[i].c}"></div></div><span class="val">${fmtDur(a.tot[i])} · ${pctS(i)} %</span></div>`).join('')}
     <p class="mut small" style="margin:10px 0 0">Repères adultes : profond ~15-25 %, paradoxal ~20-25 % du sommeil. Estimation à partir des mouvements, à lire comme une tendance.</p></div>
   <div class="card"><h2>Événements</h2><div class="kv">
@@ -533,6 +569,7 @@ function renderReport(n){const a=n.analysis,c=n.counts||{},asl=Math.max(1,a.asle
     <div><b>${c.toux||0}</b><span>toux</span></div>
     <div><b>${c.parole||0}</b><span>paroles</span></div></div>
     ${c.bruit?`<p class="mut small" style="margin:10px 0 0">${c.bruit} bruit${c.bruit>1?'s':''} extérieur${c.bruit>1?'s':''} long${c.bruit>1?'s':''} ignoré${c.bruit>1?'s':''} pour les phases.</p>`:''}</div>
+  ${respCard(n)}
   <div class="card"><h2>Niveau sonore</h2><canvas id="cvN" height="110"></canvas></div>
   <div class="card"><div class="row"><h2 style="margin:0">Moments les plus bruyants</h2><button class="btn sm danger" id="bClipsDel" style="display:none">Tout effacer</button></div><div id="clips" class="mut small" style="margin-top:8px">Chargement…</div></div>
   ${gapMin>0?`<div class="warn">Le micro s'est arrêté environ ${gapMin} min pendant la nuit (écran verrouillé ou appli en arrière-plan). L'analyse de ces moments est incomplète.</div>`:''}
@@ -552,7 +589,8 @@ function drawHypno(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),a=n.analysis
   g.fillStyle='rgba(232,236,248,.55)';g.font='10px -apple-system,sans-serif';g.textAlign='left';['Éveil','Paradoxal','Léger','Profond'].forEach((l,r)=>g.fillText(l,4,top+r*rowH+12));
   const ey=top+ch+12;
   (n.snoreEps||[]).forEach(e=>{const i0=(e.t-n.start)/60000;g.fillStyle='rgba(199,125,255,.6)';g.fillRect(x(i0),ey-4,Math.max(3,x(i0+e.d/60)-x(i0)),8)});
-  n.events.forEach(e=>{if(e.type!=='toux'&&e.type!=='parole')return;const i=(e.t-n.start)/60000;g.fillStyle=e.type==='toux'?'#ff9f6b':'#4cd6a0';g.beginPath();g.arc(x(i),ey,3.5,0,7);g.fill()});
+  n.events.forEach(e=>{if((e.type!=='toux'&&e.type!=='parole')||!significant(n,e))return;const i=(e.t-n.start)/60000;g.fillStyle=e.type==='toux'?'#ff9f6b':'#4cd6a0';g.beginPath();g.arc(x(i),ey,3.5,0,7);g.fill()});
+  (n.apneas||[]).forEach(e=>{const i=(e.t-n.start)/60000;g.fillStyle='#ff6b6b';g.beginPath();g.moveTo(x(i),ey-6);g.lineTo(x(i)-4,ey+5);g.lineTo(x(i)+4,ey+5);g.fill()});
   if(n.alarm&&n.alarm.on&&n.alarm.smart){const i0=(n.alarm.winStart-n.start)/60000,i1=(n.alarm.wake-n.start)/60000;if(i0<N){g.strokeStyle='rgba(242,184,75,.8)';g.setLineDash([3,3]);g.strokeRect(x(i0),top,Math.min(x(i1),w)-x(i0),ch);g.setLineDash([])}}
   timeAxis(g,n,w,h-6,x0)}
 function drawNoise(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),d=n.m.db,N=d.length,v=d.map((x,i)=>n.m.dbn[i]?x:null),vals=v.filter(x=>x!==null);if(!vals.length)return;
@@ -575,7 +613,7 @@ async function renderHistory(){const ns=(await DB.all('nights')).filter(n=>n.sta
   box.innerHTML=ns.map(n=>{const a=n.analysis||{tot:[0,0,0,0],st:[1]},N=Math.max(1,a.st.length);
     return `<div class="hist" data-id="${n.id}"><div class="sc" style="color:${scoreColor(a.score)}">${a.score??'–'}</div><div style="flex:1"><div class="row"><b>${dayLabel(n.end||n.start)}</b><span class="mut small">${fmtDur(a.asleep||0)}</span></div>
     <div class="mini">${[3,2,1,0].map(i=>`<div style="width:${a.tot[i]/N*100}%;background:${STAGES[i].c}"></div>`).join('')}</div>
-    <div class="mut small">${hm(n.start)} → ${hm(n.end||n.start)}${n.counts&&n.counts.ronfMin>=1?' · ronflements '+fmtDur(n.counts.ronfMin):''}${n.demo?' · démo':''}</div></div></div>`}).join('');
+    <div class="mut small">${hm(n.start)} → ${hm(n.end||n.start)}${n.counts&&n.counts.ronfMin>=1?' · ronflements '+fmtDur(n.counts.ronfMin):''}${n.counts&&n.counts.pauses?' · '+n.counts.pauses+' pause'+(n.counts.pauses>1?'s':''):''}${n.demo?' · démo':''}</div></div></div>`}).join('');
   $$('.hist[data-id]').forEach(el=>el.onclick=()=>openReport(el.dataset.id,'history'));
   const wk=ns.filter(n=>n.start>Date.now()-7*86400000&&!n.demo&&n.analysis);
   $('#weekCard').innerHTML=wk.length?`<div class="card"><h2>7 derniers jours</h2><div class="kv"><div><b>${fmtDur(wk.reduce((s,n)=>s+n.analysis.asleep,0)/wk.length)}</b><span>de sommeil en moyenne</span></div><div><b>${Math.round(wk.reduce((s,n)=>s+n.analysis.score,0)/wk.length)}</b><span>score moyen (${wk.length} nuit${wk.length>1?'s':''})</span></div></div></div>`:''}
@@ -624,7 +662,8 @@ async function makeDemo(){
 /* ---------- démarrage ---------- */
 (async()=>{await DB.open();
   // récupère une nuit restée « en cours » (page fermée, batterie vide…)
-  try{for(const n of await DB.all('nights')){if(n.status==='en_cours'){n.end=n.start+Math.max(1,n.m.act.length)*60000;n.status='interrompue';finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
+  try{for(const n of await DB.all('nights')){if(n.status==='en_cours'){n.end=n.start+Math.max(1,n.m.act.length)*60000;n.status='interrompue';finalizeNight(n);await DB.put('nights',n)}
+    else if(n.rules!=='1.2'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
   syncSettings();renderHome();
   try{const c=document.createElement('canvas');c.width=c.height=180;const g=c.getContext('2d');g.fillStyle='#0b1020';g.fillRect(0,0,180,180);g.fillStyle='#8aa4ff';g.beginPath();g.arc(95,85,52,0,7);g.fill();g.fillStyle='#0b1020';g.beginPath();g.arc(120,68,46,0,7);g.fill();
     const l=document.createElement('link');l.rel='apple-touch-icon';l.href=c.toDataURL();document.head.appendChild(l);const l2=document.createElement('link');l2.rel='icon';l2.href=l.href;document.head.appendChild(l2)}catch(e){}
