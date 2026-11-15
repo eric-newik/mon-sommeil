@@ -72,6 +72,11 @@ canvas{width:100%;display:block}
 .clip{background:var(--card2);border-radius:14px;padding:10px 12px;margin:8px 0}
 .clip audio{width:100%;height:36px;margin-top:8px}
 .clip .x{background:none;border:0;color:var(--danger);font-size:14px;padding:4px}
+.verdict{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:var(--mut)}
+.verdict button{border:1px solid var(--line);background:transparent;color:var(--txt);border-radius:10px;padding:6px 10px;font-size:13px}
+.verdict button.on.ok{background:#4cd6a033;border-color:#4cd6a0}.verdict button.on.no{background:#ff6b6b33;border-color:#ff6b6b}
+.verdict select{font-size:13px;padding:6px 8px}
+.lbsaved{color:#4cd6a0;font-size:12px}
 .hist{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line);cursor:pointer}
 .hist:first-child{border-top:0}.hist .sc{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;background:var(--card2);flex:none}
 .hist .mini{height:6px;border-radius:6px;overflow:hidden;display:flex;margin-top:6px}
@@ -165,7 +170,7 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
     <details><summary>Réveil intelligent</summary>
       <p class="mut small">Pendant la fenêtre choisie, dès qu'un mouvement net est détecté (signe de sommeil léger), la sonnerie démarre doucement. Sinon elle sonne à l'heure prévue.</p></details>
   </div>
-  <p class="mut small" style="text-align:center">Mon Sommeil · version 1.3</p>
+  <p class="mut small" style="text-align:center">Mon Sommeil · version 1.4</p>
 </section>
 
 <nav class="tabs" id="tabs">
@@ -380,7 +385,7 @@ class Tracker{
     else if(attack<=0.1&&ev.peak>=this.thr+9&&fm+fh>=0.55&&(dur<=0.8||(dur<=2.5&&syl<=3)))type='toux';
     else if(dur>=0.4&&dur<=4&&fl>=0.35&&fh<0.2&&ev.peak>=this.thr+10)type='snore?';
     else type='mouvement';
-    const e={t:ev.t,d:dur,p:ev.peak,type,sIdx:ev.sIdx,eIdx:ev.eIdx};
+    const e={t:ev.t,d:dur,p:ev.peak,type,sIdx:ev.sIdx,eIdx:ev.eIdx,f:{d:+dur.toFixed(2),p:+ev.peak.toFixed(1),fl:+fl.toFixed(2),fm:+fm.toFixed(2),fh:+fh.toFixed(2),syl,att:+attack.toFixed(2)}};
     if(type==='bruit'){const so=[...fr].sort((a,b)=>a-b);this.floor+=Math.max(0,so[Math.floor(so.length/2)]-2)}
     if(type==='snore?')this.snoreCand(e);else this.commit(e);
   }
@@ -394,7 +399,7 @@ class Tracker{
     const a={t:Math.round(prevSnd),d:+gap.toFixed(1),p:+ev.peak.toFixed(1)};this.night.apneas.push(a);
     this.onEvent&&this.onEvent({type:'pause'});
     if(this.maxClips){const R=this.rate,to=ev.sIdx+Math.round(5*R),from=Math.max(ev.sIdx-Math.round(Math.min(gap+4,22)*R),to-Math.round(30*R));
-      this.clipQ.push({from,to,score:ev.peak+12+gap/3,type:'pause',t:prevSnd-4000})}
+      this.clipQ.push({from,to,score:ev.peak+12+gap/3,type:'pause',t:prevSnd-4000,f:{gap:+gap.toFixed(1),p:+ev.peak.toFixed(1),med:+med.toFixed(1),ctx:ctx.length}})}
   }
   commit(e){addEvent(this.night,e);this.onEvent&&this.onEvent(e);this.considerClip(e)}
   snoreCand(e){
@@ -405,7 +410,7 @@ class Tracker{
       if(i1>=1.8&&i1<=10&&i2>=1.8&&i2<=10&&Math.abs(i1-i2)<=Math.max(i1,i2)*0.6){
         this.ep={t:rec[0].t,last:0,n:0,p:-100};this.pend=this.pend.filter(c=>!rec.includes(c));
         rec.forEach(c=>this.addSnore(c));
-        this.considerClip({type:'ronflement',p:Math.max(...rec.map(c=>c.p)),sIdx:rec[0].sIdx,eIdx:e.eIdx,t:rec[0].t})}}
+        this.considerClip({type:'ronflement',p:Math.max(...rec.map(c=>c.p)),sIdx:rec[0].sIdx,eIdx:e.eIdx,t:rec[0].t,f:Object.assign({},e.f,{n:rec.length,iv:+((rec[rec.length-1].t-rec[0].t)/1000/(rec.length-1)).toFixed(1)})})}}
   }
   addSnore(e){const ep=this.ep;ep.last=e.t+e.d*1000;this.lastSnoreEnd=Math.max(this.lastSnoreEnd,ep.last);this.recentSn.push({t:e.t,p:e.p});if(this.recentSn.length>12)this.recentSn.shift();this.night.snores.push([Math.round(e.t),+e.d.toFixed(1),+e.p.toFixed(1)]);ep.n++;ep.p=Math.max(ep.p,e.p);const r={...e,type:'ronflement'};addEvent(this.night,r);this.onEvent&&this.onEvent(r)}
   closeEp(){const ep=this.ep;this.ep=null;this.night.snoreEps.push({t:ep.t,d:Math.round((ep.last-ep.t)/1000),n:ep.n,p:+ep.p.toFixed(1)});this.onEvent&&this.onEvent({type:'episode'})}
@@ -416,8 +421,8 @@ class Tracker{
     const R=this.rate,score=e.p+({parole:6,toux:4,ronflement:3,mouvement:0,bruit:-3}[e.type]||0);
     const from=e.sIdx-Math.round(3*R);let to=e.eIdx+Math.round(3*R);if(to-from>30*R)to=from+Math.round(30*R);
     const last=this.clipQ[this.clipQ.length-1];
-    if(last&&from<=last.to){last.to=Math.min(Math.max(last.to,to),last.from+Math.round(30*R));if(score>last.score){last.score=score;last.type=e.type}return}
-    this.clipQ.push({from,to,score,type:e.type,t:e.t-3000});
+    if(last&&from<=last.to){last.to=Math.min(Math.max(last.to,to),last.from+Math.round(30*R));if(score>last.score&&last.type!=='pause'){last.score=score;last.type=e.type;last.f=e.f}return}
+    this.clipQ.push({from,to,score,type:e.type,t:e.t-3000,f:e.f});
   }
   flushClips(force){while(this.clipQ.length&&(force||this.total>=this.clipQ[0].to))this.saveClip(this.clipQ.shift())}
   saveClip(c){
@@ -425,7 +430,7 @@ class Tracker{
     if(this.clips.length>=this.maxClips){let mi=0;for(let i=1;i<this.clips.length;i++)if(this.clips[i].score<this.clips[mi].score)mi=i;
       if(this.clips[mi].score>=c.score)return;const old=this.clips.splice(mi,1)[0];DB.del('clips',old.id).catch(()=>{})}
     const len=to-from,f=new Float32Array(len);for(let i=0;i<len;i++)f[i]=this.ring[(from+i)%this.ringLen];
-    const meta={id:'c'+Math.round(c.t)+'_'+Math.random().toString(36).slice(2,6),nightId:this.night.id,t:c.t,type:c.type,score:+c.score.toFixed(1),dur:+(len/this.rate).toFixed(1)};
+    const meta={id:'c'+Math.round(c.t)+'_'+Math.random().toString(36).slice(2,6),nightId:this.night.id,t:c.t,type:c.type,score:+c.score.toFixed(1),dur:+(len/this.rate).toFixed(1),f:c.f||null,sens:S.sens};
     this.clips.push(meta);DB.put('clips',{...meta,wav:wavFromFloat(f,this.rate)}).catch(()=>{});
   }
   async stop(){
@@ -571,7 +576,7 @@ function renderReport(n){const a=n.analysis,c=n.counts||{},asl=Math.max(1,a.asle
     ${c.bruit?`<p class="mut small" style="margin:10px 0 0">${c.bruit} bruit${c.bruit>1?'s':''} extérieur${c.bruit>1?'s':''} long${c.bruit>1?'s':''} ignoré${c.bruit>1?'s':''} pour les phases.</p>`:''}</div>
   ${respCard(n)}
   <div class="card"><h2>Niveau sonore</h2><canvas id="cvN" height="110"></canvas></div>
-  <div class="card"><div class="row"><h2 style="margin:0">Moments les plus bruyants</h2><button class="btn sm danger" id="bClipsDel" style="display:none">Tout effacer</button></div><div id="clips" class="mut small" style="margin-top:8px">Chargement…</div></div>
+  <div class="card"><div class="row"><h2 style="margin:0">Moments les plus bruyants</h2><button class="btn sm danger" id="bClipsDel" style="display:none">Tout effacer</button></div><p class="mut small" style="margin:6px 0 0">Après écoute, indique si chaque extrait est bien détecté : tes réponses sont gardées dans l'export (même si tu effaces l'extrait) et servent à affiner la détection.</p><div id="clips" class="mut small" style="margin-top:8px">Chargement…</div></div>
   ${gapMin>0?`<div class="warn">Le micro s'est arrêté environ ${gapMin} min pendant la nuit (écran verrouillé ou appli en arrière-plan). L'analyse de ces moments est incomplète.</div>`:''}
   <button class="btn danger" id="bDelNight" style="margin-top:14px">Supprimer cette nuit</button>`;
   requestAnimationFrame(()=>{drawHypno($('#cvH'),n);drawNoise($('#cvN'),n)});
@@ -598,12 +603,26 @@ function drawNoise(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),d=n.m.db,N=d
   g.strokeStyle='#8aa4ff';g.lineWidth=1.5;g.beginPath();let st=false;v.forEach((x,i)=>{if(x===null){st=false;return}const px=i/N*w;st?g.lineTo(px,y(x)):g.moveTo(px,y(x));st=true});g.stroke();
   g.fillStyle='#8c95b3';g.font='10px -apple-system,sans-serif';g.textAlign='left';g.fillText(Math.round(hi)+' dB',2,top+9);g.fillText(Math.round(lo)+' dB',2,top+ch-2);
   timeAxis(g,n,w,h-4,0)}
+const REAL=[['ronflement','Ronflement'],['pause','Pause respiratoire'],['respiration','Respiration normale'],['toux','Toux'],['parole','Parole'],['mouvement','Mouvement / draps'],['bruit','Bruit extérieur'],['autre','Autre / rien']];
+const QUEST={pause:'Vraie pause respiratoire ?',parole:'Vraiment de la parole ?',toux:'Vraiment une toux ?',ronflement:'Vraiment un ronflement ?',mouvement:'Vraiment un mouvement ?',bruit:'Vraiment un bruit extérieur ?'};
+function verdictUI(c,n){const lb=(n.labels||{})[c.id]||{},v=lb.verdict;
+  return `<div class="verdict"><span>${QUEST[c.type]||'Bien détecté ?'}</span><button class="ok${v==='ok'?' on':''}" data-v="ok">✓ Oui</button><button class="no${v==='non'?' on':''}" data-v="non">✗ Non</button>
+  <select ${v==='non'?'':'hidden'}><option value="">C'était plutôt…</option>${REAL.filter(r=>r[0]!==c.type).map(r=>`<option value="${r[0]}"${lb.real===r[0]?' selected':''}>${r[1]}</option>`).join('')}</select>${v?'<span class="lbsaved">enregistré</span>':''}</div>`}
+async function saveLabel(n,c,verdict,real){n.labels=n.labels||{};
+  n.labels[c.id]={t:Math.round(c.t),type:c.type,verdict,real:verdict==='ok'?c.type:(real||null),f:c.f||null,score:c.score,dur:c.dur,sens:c.sens||n.sens,at:Date.now()};
+  await DB.put('nights',n)}
+function wireVerdict(v,n,cl){const id=v.closest('.clip').dataset.id,c=cl.find(x=>x.id===id),sel=v.querySelector('select');
+  const mark=()=>{const lb=n.labels[id];v.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===lb.verdict));sel.hidden=lb.verdict!=='non';
+    let t=v.querySelector('.lbsaved');if(!t){t=document.createElement('span');t.className='lbsaved';v.appendChild(t)}t.textContent='enregistré'};
+  v.querySelectorAll('button').forEach(b=>b.onclick=async()=>{await saveLabel(n,c,b.dataset.v,sel.value);mark();if(b.dataset.v==='non'&&!sel.value)sel.focus()});
+  sel.onchange=async()=>{await saveLabel(n,c,'non',sel.value);mark()}}
 async function renderClips(n){const box=$('#clips'),cl=(await DB.clipsOf(n.id)).sort((a,b)=>a.t-b.t);
   (App.urls||[]).forEach(u=>URL.revokeObjectURL(u));App.urls=[];
   if(!cl.length){box.innerHTML='Aucun extrait gardé pour cette nuit.';$('#bClipsDel').style.display='none';return}
   $('#bClipsDel').style.display='';
   box.innerHTML=cl.map(c=>{const u=URL.createObjectURL(new Blob([c.wav],{type:'audio/wav'}));App.urls.push(u);const T=TYPES[c.type]||TYPES.bruit;
-    return `<div class="clip" data-id="${esc(c.id)}"><div class="row"><span style="color:var(--txt)">${T.i} <b>${T.l}</b> · ${hm(c.t)} <span class="mut">· ${Math.round(c.dur)} s</span></span><button class="x">Effacer</button></div><audio controls preload="metadata" src="${u}"></audio></div>`}).join('');
+    return `<div class="clip" data-id="${esc(c.id)}"><div class="row"><span style="color:var(--txt)">${T.i} <b>${T.l}</b> · ${hm(c.t)} <span class="mut">· ${Math.round(c.dur)} s</span></span><button class="x">Effacer</button></div><audio controls preload="metadata" src="${u}"></audio>${verdictUI(c,n)}</div>`}).join('');
+  $$('#clips .verdict').forEach(v=>wireVerdict(v,n,cl));
   $$('#clips .x').forEach(b=>b.onclick=async()=>{const el=b.closest('.clip');await DB.del('clips',el.dataset.id);el.remove();if(!$$('#clips .clip').length)renderClips(n)});
   $('#bClipsDel').onclick=async()=>{if(!await ask('Effacer tous les extraits audio de cette nuit ?','Effacer'))return;for(const c of cl)await DB.del('clips',c.id);renderClips(n)}}
 
