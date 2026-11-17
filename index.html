@@ -185,7 +185,7 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
     <details><summary>Réveil intelligent</summary>
       <p class="mut small">Pendant la fenêtre choisie, dès qu'un mouvement net est détecté (signe de sommeil léger), la sonnerie démarre doucement. Sinon elle sonne à l'heure prévue.</p></details>
   </div>
-  <p class="mut small" style="text-align:center">Mon Sommeil · version 1.9</p>
+  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.0</p>
 </section>
 
 <nav class="tabs" id="tabs">
@@ -542,7 +542,7 @@ function onLive(e){const n=App.tr.night,c=n.counts||{};
 function nightTick(){const now=Date.now(),t=hm(now);$('#nClock').textContent=t;$('#dClock').textContent=t;const tr=App.tr;if(!tr||!tr.running)return;
   if(now<tr.night.start){$('#nStatus').textContent='L\'écoute commence à '+hm(tr.night.start)+' · installe-toi tranquillement'}
   else if(tr.floor===null){$('#nStatus').textContent='Calibrage du bruit de fond…'}
-  if(tr.floor!==null){$('#nStatus').textContent='Écoute en cours · fond '+Math.round(tr.floor)+' dB';$('#nMeter').style.width=clamp((tr.level-tr.floor)/30*100,2,100)+'%';
+  if(tr.floor!==null){$('#nStatus').textContent='Écoute en cours';$('#nMeter').style.width=clamp((tr.level-tr.floor)/30*100,2,100)+'%';
     $('#nMeter').style.background=tr.level-tr.floor>tr.thr?'#f2b84b':'#8aa4ff'}
   const a=tr.night.alarm;if(!a.on||App.ringing)return;
   if(now>=a.wake)ring('heure');
@@ -606,7 +606,7 @@ function renderReport(n){const a=n.analysis,c=n.counts||{},asl=Math.max(1,a.asle
     <div><b>${c.parole||0}</b><span>paroles</span></div></div>
     ${c.bruit?`<p class="mut small" style="margin:10px 0 0">${c.bruit} bruit${c.bruit>1?'s':''} extérieur${c.bruit>1?'s':''} long${c.bruit>1?'s':''} ignoré${c.bruit>1?'s':''} pour les phases.</p>`:''}</div>
   ${respCard(n)}
-  <div class="card"><h2>Niveau sonore</h2><canvas id="cvN" height="110"></canvas></div>
+  <div class="card"><h2>Niveau sonore</h2><p class="mut small" style="margin:0 0 6px">En dB au-dessus du calme de ta chambre (0 = les minutes les plus calmes), moyenne par minute. Mesure relative : le micro du téléphone n'est pas un sonomètre.</p><canvas id="cvN" height="120"></canvas></div>
   <div class="card"><div class="row"><h2 style="margin:0">Moments les plus bruyants</h2><button class="btn sm danger" id="bClipsDel" style="display:none">Tout effacer</button></div><p class="mut small" style="margin:6px 0 0">Après écoute, indique si chaque extrait est bien détecté : tes réponses sont gardées dans l'export (même si tu effaces l'extrait) et servent à affiner la détection.</p><div id="clips" class="mut small" style="margin-top:8px">Chargement…</div></div>
   ${gapMin>0?`<div class="warn">Le micro s'est arrêté environ ${gapMin} min pendant la nuit (écran verrouillé ou appli en arrière-plan). L'analyse de ces moments est incomplète.</div>`:''}
   <button class="btn danger" id="bDelNight" style="margin-top:14px">Supprimer cette nuit</button>`;
@@ -654,11 +654,15 @@ function drawHypno(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),a=n.analysis
   n.events.forEach(e=>{if((e.type!=='toux'&&e.type!=='parole')||!significant(n,e))return;const i=(e.t-n.start)/60000;g.fillStyle=e.type==='toux'?'#ff9f6b':'#4cd6a0';g.globalAlpha=.8;g.beginPath();g.arc(x(i),ey+(e.type==='toux'?-3:3),2.6,0,7);g.fill();g.globalAlpha=1});
   (n.apneas||[]).forEach(e=>{const i=(e.t-n.start)/60000;g.fillStyle='#ff6b6b';g.beginPath();g.moveTo(x(i),ey-7);g.lineTo(x(i)-5,ey+6);g.lineTo(x(i)+5,ey+6);g.fill()});
   timeAxis(g,n,R+6-0,h-4,L)}
-function drawNoise(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),d=n.m.db,N=d.length,v=d.map((x,i)=>n.m.dbn[i]?x:null),vals=v.filter(x=>x!==null);if(!vals.length)return;
-  const lo=Math.min(...vals),hi=Math.max(lo+10,Math.max(...vals)),top=6,ch=h-26,y=x=>top+ch-(x-lo)/(hi-lo)*ch;
-  g.strokeStyle='#8aa4ff';g.lineWidth=1.5;g.beginPath();let st=false;v.forEach((x,i)=>{if(x===null){st=false;return}const px=i/N*w;st?g.lineTo(px,y(x)):g.moveTo(px,y(x));st=true});g.stroke();
-  g.fillStyle='#8c95b3';g.font='10px -apple-system,sans-serif';g.textAlign='left';g.fillText(Math.round(hi)+' dB',2,top+9);g.fillText(Math.round(lo)+' dB',2,top+ch-2);
-  timeAxis(g,n,w,h-4,0)}
+function drawNoise(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),d=n.m.db,N=d.length,raw=d.map((x,i)=>n.m.dbn[i]?x:null),ok=raw.filter(x=>x!==null);if(!ok.length)return;
+  // v2.0 : relatif au calme de la chambre (5 % des minutes les plus calmes = 0 dB)
+  const so=[...ok].sort((a,b)=>a-b),base=so[Math.floor(so.length*0.05)],v=raw.map(x=>x===null?null:Math.max(0,x-base)),mx=Math.max(10,...v.filter(x=>x!==null));
+  const L=34,top=6,ch=h-26,PW=w-L-4,y=x=>top+ch-x/mx*ch,X=i=>L+i/N*PW;
+  g.font='10px -apple-system,sans-serif';g.textAlign='right';
+  for(let t=0;t<=mx;t+=10){g.strokeStyle='rgba(255,255,255,'+(t?.07:.15)+')';g.beginPath();g.moveTo(L,y(t)+.5);g.lineTo(L+PW,y(t)+.5);g.stroke();g.fillStyle='#8c95b3';g.fillText(t?'+'+t:'0',L-6,y(t)+3)}
+  g.strokeStyle='#8aa4ff';g.lineWidth=1.5;g.beginPath();let st=false;v.forEach((x,i)=>{if(x===null){st=false;return}st?g.lineTo(X(i),y(x)):g.moveTo(X(i),y(x));st=true});g.stroke();
+  const pk=v.reduce((b,x,i)=>x!==null&&x>(v[b]??-1)?i:b,0);if(v[pk]>0){g.fillStyle='#e8ecf8';g.beginPath();g.arc(X(pk),y(v[pk]),3,0,7);g.fill();g.textAlign=X(pk)>w-60?'right':'left';g.fillText('pic +'+Math.round(v[pk])+' dB · '+hm(n.start+pk*60000),X(pk)+(g.textAlign==='left'?6:-6),Math.max(top+9,y(v[pk])-4))}
+  timeAxis(g,n,w-4,h-4,L)}
 const REAL=[['ronflement','Ronflement'],['pause','Pause respiratoire'],['respiration','Respiration normale'],['toux','Toux'],['parole','Parole'],['mouvement','Mouvement / draps'],['bruit','Bruit extérieur'],['autre','Autre / rien']];
 const QUEST={pause:'Vraie pause respiratoire ?',parole:'Vraiment de la parole ?',toux:'Vraiment une toux ?',ronflement:'Vraiment un ronflement ?',mouvement:'Vraiment un mouvement ?',bruit:'Vraiment un bruit extérieur ?'};
 function verdictUI(c,n){const lb=(n.labels||{})[c.id]||{},v=lb.verdict;
