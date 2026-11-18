@@ -187,7 +187,7 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
     <details><summary>Réveil intelligent</summary>
       <p class="mut small">Pendant la fenêtre choisie, dès qu'un mouvement net est détecté (signe de sommeil léger), la sonnerie démarre doucement. Sinon elle sonne à l'heure prévue.</p></details>
   </div>
-  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.4</p>
+  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.4.1</p>
 </section>
 
 <nav class="tabs" id="tabs">
@@ -604,7 +604,7 @@ const EXOS=[
  {t:'Langue aspirée',d:'Aspire toute la langue vers le haut et plaque-la entièrement contre le palais.',n:20},
  {t:'Langue vers le bas',d:'Garde le bout de la langue contre les dents du bas et appuie le fond de la langue vers le bas.',n:20},
  {t:'Voile du palais',d:'Bouche ouverte, lève le fond de la gorge (le voile du palais) en disant « A » par à-coups.',n:20},
- {t:'Joues',d:'Un doigt propre dans la bouche, pousse la joue vers l\'extérieur avec le muscle de la joue. 10 fois à gauche, puis 10 fois à droite.',n:20,side:true}];
+ {t:'Joues',d:'Index propre à l\'intérieur de la joue : le doigt tire la joue vers l\'extérieur, et toi tu serres la joue pour ramener le doigt vers les dents. 10 fois à gauche, puis 10 fois à droite.',n:20,side:true}];
 const exoKey=t=>{const d=new Date(t);if(d.getHours()<6)d.setDate(d.getDate()-1);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
 const exoDays=()=>{try{return JSON.parse(localStorage.getItem('sommeil.exos')||'[]')}catch(e){return[]}};
 function exoStreak(){const set=new Set(exoDays());let k=0,d=new Date();if(d.getHours()<6)d.setDate(d.getDate()-1);if(!set.has(exoKey(d.getTime())))d.setDate(d.getDate()-1);
