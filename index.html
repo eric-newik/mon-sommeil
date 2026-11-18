@@ -106,6 +106,8 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
       <select id="window"><option value="10">10 min</option><option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option></select></div>
     <p class="mut small" id="wakeTxt" style="margin:8px 0 0"></p>
   </div>
+  <div class="card" id="exoCard"><div class="row"><div><h2 style="margin:0 0 2px">Exercices anti-ronflement</h2><div class="mut small" id="exoTxt"></div></div></div>
+    <button class="btn sec" id="bExo" style="margin-top:12px">💪 Faire mes exercices (8 min)</button></div>
   <button class="btn" id="bStart">🌙 Commencer la nuit</button>
   <div class="card" style="margin-top:14px">
     <h2>Avant de dormir</h2>
@@ -185,7 +187,7 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
     <details><summary>Réveil intelligent</summary>
       <p class="mut small">Pendant la fenêtre choisie, dès qu'un mouvement net est détecté (signe de sommeil léger), la sonnerie démarre doucement. Sinon elle sonne à l'heure prévue.</p></details>
   </div>
-  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.0</p>
+  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.4</p>
 </section>
 
 <nav class="tabs" id="tabs">
@@ -208,6 +210,17 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
   <div class="warn" id="wlWarn" hidden>Ton navigateur ne peut pas garder l'écran allumé tout seul. Règle le verrouillage automatique sur « Jamais » le temps de la nuit (Réglages › Luminosité / Affichage).</div>
   <div class="nbtns"><button class="btn sec" id="bDim">Assombrir</button><button class="btn sec" id="bEnd">Terminer</button></div>
   <div id="dimmer" hidden><div id="dClock"></div></div>
+</div>
+
+<!-- EXERCICES -->
+<div class="overlay" id="exo" style="background:var(--bg)">
+  <div class="mut small" id="exStep"></div>
+  <h2 id="exTitle" style="font-size:22px;margin:10px 0 8px"></h2>
+  <p id="exDesc" class="mut" style="max-width:360px;margin:0 0 24px"></p>
+  <div id="exCount" style="font-size:64px;font-weight:200"></div>
+  <div class="meter" style="width:80%;max-width:360px;margin:16px auto 30px"><div id="exBar"></div></div>
+  <div style="display:flex;gap:10px;width:100%;max-width:360px"><button class="btn sec" id="exPause" style="margin:0">Pause</button><button class="btn sec" id="exNext" style="margin:0">Passer ›</button></div>
+  <button class="back" id="exQuit" style="margin-top:22px">Arrêter</button>
 </div>
 
 <!-- SONNERIE -->
@@ -269,6 +282,7 @@ function nearSnore(n,t,w=12000){const sn=n.snores;if(!sn||!sn.length)return fals
   return Math.abs(T[lo]-t)<=w||(lo>0&&Math.abs(T[lo-1]-t)<=w)}
 function evRule(n,e){const thr=SENS[n.sens]||8;
   if(e.type==='parole'){const x=e.x;if((x&&x[2]<0.08)||nearSnore(n,e.t))return{act:0,k:null}}
+  if(e.type==='mouvement'&&e.x&&e.d>=0.6&&e.x[2]<0.25&&e.x[4]>=0.4&&nearSnore(n,e.t,15000))return{act:0,k:null}; // v2.2 : ronflement mal classé
   switch(e.type){
     case 'mouvement':{const big=e.d>=0.6||e.p>=thr+22;return big?{act:1+Math.min(2,Math.max(0,e.p-thr)/15),k:'mov'}:{act:0.02,k:null}}
     case 'toux':return e.p>=thr+18?{act:0.7,k:'cough'}:{act:0.02,k:null};
@@ -328,7 +342,7 @@ function finalizeNight(n){
   // v1.9 : ne garder que les pauses précédées d'au moins 3 ronflements confirmés dans la minute
   if(n.snores&&n.snores.length&&(n.apneasRaw||n.apneas)){n.apneasRaw=n.apneasRaw||n.apneas.slice();const T=n.snores.map(x=>x[0]);
     n.apneas=n.apneasRaw.filter(a=>T.filter(t=>t<=a.t&&a.t-t<=60000).length>=3)}
-  rebuildAct(n);n.analysis=analyze(n);n.rules='1.9';
+  rebuildAct(n);n.analysis=analyze(n);n.rules='2.2';
   const c={mouvement:0,toux:0,parole:0,bruit:0};n.events.forEach(e=>{if(c[e.type]!==undefined&&(e.type==='bruit'||significant(n,e)))c[e.type]++});
   c.ronfMin=n.m.snore.reduce((a,v)=>a+v,0)/60;c.episodes=n.snoreEps.length;c.pauses=(n.apneas||[]).length;n.counts=c;
 }
@@ -360,7 +374,7 @@ class Tracker{
     this.bL=B(60,300);this.bM=B(300,3000);this.bH=B(3000,8000);
     this.dec=Math.max(1,Math.round(sr/16000));this.rate=sr/this.dec;this.ringLen=Math.ceil(this.rate*75);this.ring=new Float32Array(this.ringLen);this.total=0;
     this.thr=SENS[S.sens]||8;this.maxClips=+S.maxClips;
-    const t0=Date.now(),n=this.night=newNight(t0+(+S.delay||0)*60000);n.bed=t0;n.sens=S.sens;n.alarm=opts.alarm;n.rate=this.rate;
+    const t0=Date.now(),n=this.night=newNight(t0+(+S.delay||0)*60000);n.bed=t0;n.sens=S.sens;if(exoDays().includes(exoKey(t0)))n.tags=['exos'];n.alarm=opts.alarm;n.rate=this.rate;
     this.floor=null;this.init=[];this.ev=null;this.pend=[];this.lastSnd=0;this.lastSnoreEnd=0;this.recentSn=[];this.ep=null;this.clipQ=[];this.clips=[];
     this.lastProc=Date.now();this.lastSave=Date.now();this.lastTick=0;this.level=-100;this.running=true;
     this.proc.onaudioprocess=e=>{try{this.process(e)}catch(err){console.error(err)}};
@@ -412,6 +426,8 @@ class Tracker{
     else if(dur>=0.4&&dur<=4&&fl>=0.35&&fh<0.2&&ev.peak>=this.thr+10)type='snore?';
     else type='mouvement';
     const e={t:ev.t,d:dur,p:ev.peak,type,sIdx:ev.sIdx,eIdx:ev.eIdx,f:{d:+dur.toFixed(2),p:+ev.peak.toFixed(1),fl:+fl.toFixed(2),fm:+fm.toFixed(2),fh:+fh.toFixed(2),syl,att:+attack.toFixed(2)}};
+    // v2.2 : pendant une période de ronflement, un son tonal qui monte lentement est un ronflement (souvent plusieurs fusionnés), pas un mouvement ni de la parole — 6 requalifications du 18/11
+    if((type==='mouvement'||type==='parole')&&dur>=0.6&&dur<=12&&attack>=0.4&&fh<0.25&&((this.ep&&ev.t-this.ep.last<=15000)||ev.t-this.lastSnoreEnd<=15000))type='snore?';
     if(type==='bruit'){const so=[...fr].sort((a,b)=>a-b);this.floor+=Math.max(0,so[Math.floor(so.length/2)]-2)}
     if(type==='snore?')this.snoreCand(e);else this.commit(e);
   }
@@ -444,6 +460,7 @@ class Tracker{
     if(!this.maxClips)return;
     if(e.type==='mouvement'&&e.p<this.thr+8)return;
     if(e.type==='bruit'&&e.p<this.thr+12)return;
+    if((e.type==='toux'||e.type==='parole')&&!significant(this.night,e))return; // n'extraire que ce qui est compté
     const R=this.rate,score=e.p+({parole:6,toux:4,ronflement:3,mouvement:0,bruit:-3}[e.type]||0);
     const from=e.sIdx-Math.round(3*R);let to=e.eIdx+Math.round(3*R);if(to-from>30*R)to=from+Math.round(30*R);
     const last=this.clipQ[this.clipQ.length-1];
@@ -453,8 +470,14 @@ class Tracker{
   flushClips(force){while(this.clipQ.length&&(force||this.total>=this.clipQ[0].to))this.saveClip(this.clipQ.shift())}
   saveClip(c){
     const from=Math.max(c.from,this.total-this.ringLen+1,0),to=Math.min(c.to,this.total);if(to-from<this.rate*0.5)return;
-    if(this.clips.length>=this.maxClips){let mi=0;for(let i=1;i<this.clips.length;i++)if(this.clips[i].score<this.clips[mi].score)mi=i;
-      if(this.clips[mi].score>=c.score)return;const old=this.clips.splice(mi,1)[0];DB.del('clips',old.id).catch(()=>{})}
+    if(this.clips.length>=this.maxClips){
+      // v2.1 : garder au moins 2 extraits de chaque type détecté (toux, parole, pauses…) pour pouvoir les requalifier
+      const Q=2,cnt={};this.clips.forEach(x=>cnt[x.type]=(cnt[x.type]||0)+1);
+      const pool=this.clips.map((x,i)=>i).filter(i=>cnt[this.clips[i].type]>Q);
+      let mi=-1;for(const i of pool)if(mi<0||this.clips[i].score<this.clips[mi].score)mi=i;
+      if((cnt[c.type]||0)<Q){if(mi<0){mi=0;for(let i=1;i<this.clips.length;i++)if(this.clips[i].score<this.clips[mi].score)mi=i;if(this.clips[mi].score>=c.score)return}}
+      else{if(mi<0||this.clips[mi].score>=c.score)return}
+      const old=this.clips.splice(mi,1)[0];DB.del('clips',old.id).catch(()=>{})}
     const len=to-from,f=new Float32Array(len);for(let i=0;i<len;i++)f[i]=this.ring[(from+i)%this.ringLen];
     const meta={id:'c'+Math.round(c.t)+'_'+Math.random().toString(36).slice(2,6),nightId:this.night.id,t:c.t,type:c.type,score:+c.score.toFixed(1),dur:+(len/this.rate).toFixed(1),f:c.f||null,sens:S.sens};
     this.clips.push(meta);DB.put('clips',{...meta,wav:wavFromFloat(f,this.rate)}).catch(()=>{});
@@ -511,7 +534,7 @@ $('#wake').onchange=e=>{S.wake=e.target.value||'07:45';saveS();syncHome()};
 $('#alarmOn').onchange=e=>{S.alarmOn=e.target.checked;saveS();syncHome()};
 $('#smart').onchange=e=>{S.smart=e.target.checked;saveS();syncHome()};
 $('#window').onchange=e=>{S.window=+e.target.value;saveS();syncHome()};
-async function renderHome(){syncHome();const ns=(await DB.all('nights')).filter(n=>n.status!=='en_cours').sort((a,b)=>b.start-a.start);const box=$('#lastNight');
+async function renderHome(){syncHome();syncExo();const ns=(await DB.all('nights')).filter(n=>n.status!=='en_cours').sort((a,b)=>b.start-a.start);const box=$('#lastNight');
   if(!ns.length){box.innerHTML='';return}const n=ns[0],a=n.analysis||{};
   box.innerHTML=`<div class="card hist" style="border:0" id="lnCard"><div class="sc" style="color:${scoreColor(a.score)}">${a.score??'–'}</div><div style="flex:1"><b>Dernière nuit</b> <span class="mut small">${dayLabel(n.end||n.start)}</span><div class="mut small">${fmtDur(a.asleep||0)} de sommeil · ${hm(n.start)} → ${hm(n.end||n.start)}</div></div><span class="mut">›</span></div>`;
   $('#lnCard').onclick=()=>openReport(n.id,'home')}
@@ -546,8 +569,14 @@ function nightTick(){const now=Date.now(),t=hm(now);$('#nClock').textContent=t;$
     $('#nMeter').style.background=tr.level-tr.floor>tr.thr?'#f2b84b':'#8aa4ff'}
   const a=tr.night.alarm;if(!a.on||App.ringing)return;
   if(now>=a.wake)ring('heure');
-  else if(a.smart&&now>=a.winStart&&now-tr.night.start>30*60000&&recentAct(tr.night)>=1.5)ring('leger');
+  else if(a.smart&&now>=a.winStart&&now-tr.night.start>30*60000&&now-(App.lastSmart||0)>=30000){App.lastSmart=now;if(smartOK(tr.night))ring('leger')}
 }
+/* v2.3 : réveil intelligent plus exigeant — il sonnait toujours à la première seconde de la fenêtre.
+   Il faut maintenant : phase estimée éveil ou léger (pas paradoxal, pas profond), pas de ronflement dans les 2 dernières minutes,
+   et une agitation récente nettement au-dessus de l'agitation habituelle de la nuit. */
+function smartOK(n){const m=n.m.act,N=m.length;if(N<40)return false;const a=analyze(n);if(!a)return false;
+  const s1=a.st[N-1],s2=a.st[N-2],sn=n.m.snore||[];if(s1===2||s1===3||s2===2)return false;if((sn[N-1]||0)+(sn[N-2]||0)>=5)return false;
+  const so=[...m].sort((x,y)=>x-y),p75=so[Math.floor((N-1)*0.75)];return m[N-1]+m[N-2]>=Math.max(2,2*p75)}
 function recentAct(n){const m=n.m.act,i=m.length-1;let s=0;for(let k=Math.max(0,i-2);k<=i;k++)s+=m[k];return s}
 function dim(){$('#dClock').style.display=S.screen==='heure'?'':'none';$('#dimmer').hidden=false}
 $('#bDim').onclick=dim;
@@ -568,6 +597,37 @@ async function ring(reason){
 $('#bSnooze').onclick=()=>{Alarm.stop();const at=Date.now()+S.snooze*60000;$('#aMsg').textContent='Prochaine sonnerie à '+hm(at);$('#bSnooze').style.display='none';
   clearTimeout(App.snoozeT);App.snoozeT=setTimeout(()=>{$('#aClock').textContent=hm(Date.now());$('#aMsg').textContent='Debout !';$('#bSnooze').style.display='';Alarm.play(20)},S.snooze*60000)};
 $('#bUp').onclick=()=>{Alarm.stop();clearTimeout(App.snoozeT);App.ringing=false;releaseAwake();$('#alarm').classList.remove('show');openReport(App.night.id,'home')};
+
+/* ---------- exercices anti-ronflement (v2.4) — protocole Ieto et al., Chest 2015 ---------- */
+const EXOS=[
+ {t:'Langue qui glisse',d:'Pose le bout de la langue derrière les dents du haut, puis fais-la glisser vers l\'arrière le long du palais.',n:20},
+ {t:'Langue aspirée',d:'Aspire toute la langue vers le haut et plaque-la entièrement contre le palais.',n:20},
+ {t:'Langue vers le bas',d:'Garde le bout de la langue contre les dents du bas et appuie le fond de la langue vers le bas.',n:20},
+ {t:'Voile du palais',d:'Bouche ouverte, lève le fond de la gorge (le voile du palais) en disant « A » par à-coups.',n:20},
+ {t:'Joues',d:'Un doigt propre dans la bouche, pousse la joue vers l\'extérieur avec le muscle de la joue. 10 fois à gauche, puis 10 fois à droite.',n:20,side:true}];
+const exoKey=t=>{const d=new Date(t);if(d.getHours()<6)d.setDate(d.getDate()-1);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const exoDays=()=>{try{return JSON.parse(localStorage.getItem('sommeil.exos')||'[]')}catch(e){return[]}};
+function exoStreak(){const set=new Set(exoDays());let k=0,d=new Date();if(d.getHours()<6)d.setDate(d.getDate()-1);if(!set.has(exoKey(d.getTime())))d.setDate(d.getDate()-1);
+  while(set.has(exoKey(d.getTime()))){k++;d.setDate(d.getDate()-1)}return k}
+function syncExo(){const done=exoDays().includes(exoKey(Date.now())),k=exoStreak();
+  $('#exoTxt').innerHTML=(done?'<span style="color:var(--ok)">✓ Fait ce soir</span>':'Pas encore fait aujourd\'hui')+(k?` · ${k} jour${k>1?'s':''} d'affilée`:'')+'<br>5 exercices de la langue et de la gorge, à faire chaque jour pendant 3 mois.';
+  $('#bExo').textContent=done?'💪 Refaire mes exercices':'💪 Faire mes exercices (8 min)'}
+const Exo={i:0,c:0,iv:null,paused:false,
+  async start(){await ensureCtx();this.i=0;this.c=0;$('#exo').classList.add('show');keepAwake();this.show();this.run()},
+  show(){const e=EXOS[this.i];$('#exStep').textContent=`Exercice ${this.i+1} sur ${EXOS.length}`;$('#exTitle').textContent=e.t;$('#exDesc').textContent=e.d;
+    $('#exCount').textContent=this.c+' / '+e.n+(e.side?(this.c<10?' · gauche':' · droite'):'');$('#exBar').style.width=(this.c/e.n*100)+'%';$('#exPause').textContent=this.paused?'Reprendre':'Pause'},
+  tick(){if(this.paused)return;const e=EXOS[this.i];this.c++;try{const c=App.ctx,o=c.createOscillator(),g=c.createGain(),t=c.currentTime;o.frequency.value=this.c===e.n?880:660;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.15,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+.15);o.start(t);o.stop(t+.2)}catch(err){}
+    if(navigator.vibrate)try{navigator.vibrate(30)}catch(err){}
+    if(this.c>=e.n){this.next();return}this.show()},
+  run(){clearInterval(this.iv);this.iv=setInterval(()=>this.tick(),2000)},
+  next(){this.i++;this.c=0;if(this.i>=EXOS.length){this.finish();return}this.paused=true;this.show();$('#exCount').textContent='Prêt ?';$('#exPause').textContent='Commencer'},
+  finish(){clearInterval(this.iv);const d=exoDays(),k=exoKey(Date.now());if(!d.includes(k)){d.push(k);try{localStorage.setItem('sommeil.exos',JSON.stringify(d.slice(-400)))}catch(e){}}
+    $('#exo').classList.remove('show');if(!(App.tr&&App.tr.running))releaseAwake();syncExo();const s=exoStreak();toast(`Bravo ! ${s} jour${s>1?'s':''} d'affilée 💪`,3500)},
+  quit(){clearInterval(this.iv);this.paused=false;$('#exo').classList.remove('show');if(!(App.tr&&App.tr.running))releaseAwake()}};
+$('#bExo').onclick=()=>{Exo.paused=false;Exo.start()};
+$('#exPause').onclick=()=>{Exo.paused=!Exo.paused;Exo.show()};
+$('#exNext').onclick=()=>Exo.next();
+$('#exQuit').onclick=()=>Exo.quit();
 
 /* ---------- rapport ---------- */
 const scoreColor=s=>s==null?'#8c95b3':s>=75?'#4cd6a0':s>=55?'#f2b84b':'#ff6b6b';
@@ -687,7 +747,7 @@ async function renderClips(n){const box=$('#clips'),cl=(await DB.clipsOf(n.id)).
   $('#bClipsDel').onclick=async()=>{if(!await ask('Effacer tous les extraits audio de cette nuit ?','Effacer'))return;for(const c of cl)await DB.del('clips',c.id);renderClips(n)}}
 
 /* ---------- analyses écrites (nuit et long terme) ---------- */
-const TAGS=[['alcool','🍷 Alcool'],['sport','🏃 Sport'],['cafe','☕ Café après 16 h'],['repas','🍝 Repas tardif'],['stress','😟 Stress'],['ecran','📱 Écrans tard'],['cote','🛏️ Essai : dormir sur le côté']];
+const TAGS=[['exos','💪 Exercices anti-ronflement'],['alcool','🍷 Alcool'],['sport','🏃 Sport'],['cafe','☕ Café après 16 h'],['repas','🍝 Repas tardif'],['stress','😟 Stress'],['ecran','📱 Écrans tard'],['cote','🛏️ Essai : dormir sur le côté']];
 const tagLabel=t=>(TAGS.find(x=>x[0]===t)||[t,t])[1].replace(/^\S+\s/,'');
 function met(n){const a=n.analysis,asl=Math.max(1,a.asleep),bed=n.bed||n.start;
   return{n,day:n.end||n.start,asleep:a.asleep,score:a.score,deep:a.tot[3]/asl*100,rem:a.tot[2]/asl*100,awak:a.awak,
@@ -826,7 +886,7 @@ async function makeDemo(){
 (async()=>{await DB.open();
   // récupère une nuit restée « en cours » (page fermée, batterie vide…)
   try{for(const n of await DB.all('nights')){if(n.status==='en_cours'){n.end=n.start+Math.max(1,n.m.act.length)*60000;n.status='interrompue';finalizeNight(n);await DB.put('nights',n)}
-    else if(n.rules!=='1.9'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
+    else if(n.rules!=='2.2'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
   syncSettings();renderHome();
   try{const c=document.createElement('canvas');c.width=c.height=180;const g=c.getContext('2d');g.fillStyle='#0b1020';g.fillRect(0,0,180,180);g.fillStyle='#8aa4ff';g.beginPath();g.arc(95,85,52,0,7);g.fill();g.fillStyle='#0b1020';g.beginPath();g.arc(120,68,46,0,7);g.fill();
     const l=document.createElement('link');l.rel='apple-touch-icon';l.href=c.toDataURL();document.head.appendChild(l);const l2=document.createElement('link');l2.rel='icon';l2.href=l.href;document.head.appendChild(l2)}catch(e){}
