@@ -187,7 +187,7 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
     <details><summary>Réveil intelligent</summary>
       <p class="mut small">Pendant la fenêtre choisie, dès qu'un mouvement net est détecté (signe de sommeil léger), la sonnerie démarre doucement. Sinon elle sonne à l'heure prévue.</p></details>
   </div>
-  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.4.1</p>
+  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.6</p>
 </section>
 
 <nav class="tabs" id="tabs">
@@ -282,7 +282,9 @@ function nearSnore(n,t,w=12000){const sn=n.snores;if(!sn||!sn.length)return fals
   return Math.abs(T[lo]-t)<=w||(lo>0&&Math.abs(T[lo-1]-t)<=w)}
 function evRule(n,e){const thr=SENS[n.sens]||8;
   if(e.type==='parole'){const x=e.x;if((x&&x[2]<0.08)||nearSnore(n,e.t))return{act:0,k:null}}
-  if(e.type==='mouvement'&&e.x&&e.d>=0.6&&e.x[2]<0.25&&e.x[4]>=0.4&&nearSnore(n,e.t,15000))return{act:0,k:null}; // v2.2 : ronflement mal classé
+  if(e.type==='mouvement'&&e.x&&e.d>=0.6&&e.x[2]<0.25&&e.x[4]>=0.2&&nearSnore(n,e.t,15000))return{act:0,k:null}; // v2.2/2.5 : ronflement mal classé
+  if(e.type==='parole'&&n.snores&&(nearSnore(n,e.t,60000)||(e.x&&(e.x[2]<0.12||e.x[3]/Math.max(.1,e.d)<1.5))))return{act:0.02,k:null}; // v2.5
+  if(e.type==='toux'&&e.x&&(e.x[2]<0.12||e.x[2]>0.6||e.x[1]<0.25||e.d<0.2))return{act:0.02,k:null}; // v2.5 : « toux » sans aigus = début de ronflement ou clic
   switch(e.type){
     case 'mouvement':{const big=e.d>=0.6||e.p>=thr+22;return big?{act:1+Math.min(2,Math.max(0,e.p-thr)/15),k:'mov'}:{act:0.02,k:null}}
     case 'toux':return e.p>=thr+18?{act:0.7,k:'cough'}:{act:0.02,k:null};
@@ -342,7 +344,7 @@ function finalizeNight(n){
   // v1.9 : ne garder que les pauses précédées d'au moins 3 ronflements confirmés dans la minute
   if(n.snores&&n.snores.length&&(n.apneasRaw||n.apneas)){n.apneasRaw=n.apneasRaw||n.apneas.slice();const T=n.snores.map(x=>x[0]);
     n.apneas=n.apneasRaw.filter(a=>T.filter(t=>t<=a.t&&a.t-t<=60000).length>=3)}
-  rebuildAct(n);n.analysis=analyze(n);n.rules='2.2';
+  rebuildAct(n);n.analysis=analyze(n);n.rules='2.6';
   const c={mouvement:0,toux:0,parole:0,bruit:0};n.events.forEach(e=>{if(c[e.type]!==undefined&&(e.type==='bruit'||significant(n,e)))c[e.type]++});
   c.ronfMin=n.m.snore.reduce((a,v)=>a+v,0)/60;c.episodes=n.snoreEps.length;c.pauses=(n.apneas||[]).length;n.counts=c;
 }
@@ -421,13 +423,13 @@ class Tracker{
     if(dur>=11)type='bruit';
     // v1.6 : un son tonal sans aigus (pas de consonnes) et lent à monter = ronflement fort, pas de la parole (7 extraits « parole » requalifiés en ronflement le 16/11)
     else if(dur>=0.6&&dur<=3.5&&fh<0.08&&attack>=0.25&&ev.peak>=this.thr+10)type='snore?';
-    else if(dur>=0.8&&fm>=0.45&&fh>=0.08&&syl>=3&&syl/dur>=1.3&&fl<0.4)type='parole';
-    else if(attack<=0.1&&ev.peak>=this.thr+9&&fm+fh>=0.55&&(dur<=0.8||(dur<=2.5&&syl<=3)))type='toux';
+    else if(dur>=0.8&&fm>=0.45&&fh>=0.12&&syl>=3&&syl/dur>=1.5&&fl<0.4&&ev.t-this.lastSnoreEnd>60000)type='parole'; // v2.5 : 0 parole confirmée sur 12
+    else if(attack<=0.1&&ev.peak>=this.thr+9&&fm+fh>=0.55&&fh>=0.12&&fh<=0.6&&fm>=0.25&&dur>=0.2&&(dur<=0.8||(dur<=2.5&&syl<=3)))type='toux'; // v2.5 : une vraie toux contient des aigus
     else if(dur>=0.4&&dur<=4&&fl>=0.35&&fh<0.2&&ev.peak>=this.thr+10)type='snore?';
     else type='mouvement';
     const e={t:ev.t,d:dur,p:ev.peak,type,sIdx:ev.sIdx,eIdx:ev.eIdx,f:{d:+dur.toFixed(2),p:+ev.peak.toFixed(1),fl:+fl.toFixed(2),fm:+fm.toFixed(2),fh:+fh.toFixed(2),syl,att:+attack.toFixed(2)}};
     // v2.2 : pendant une période de ronflement, un son tonal qui monte lentement est un ronflement (souvent plusieurs fusionnés), pas un mouvement ni de la parole — 6 requalifications du 18/11
-    if((type==='mouvement'||type==='parole')&&dur>=0.6&&dur<=12&&attack>=0.4&&fh<0.25&&((this.ep&&ev.t-this.ep.last<=15000)||ev.t-this.lastSnoreEnd<=15000))type='snore?';
+    if((type==='mouvement'||type==='parole')&&dur>=0.6&&dur<=12&&attack>=0.2&&fh<0.25&&((this.ep&&ev.t-this.ep.last<=15000)||ev.t-this.lastSnoreEnd<=15000))type='snore?';
     if(type==='bruit'){const so=[...fr].sort((a,b)=>a-b);this.floor+=Math.max(0,so[Math.floor(so.length/2)]-2)}
     if(type==='snore?')this.snoreCand(e);else this.commit(e);
   }
@@ -800,10 +802,11 @@ function longInsights(ms){const L=[],h=fmtDur,k=ms.length;if(k<2)return L;
   const dp=A(x=>x.deep);L.push(['n',`Sommeil profond moyen : ${Math.round(dp)} %, paradoxal ${Math.round(A(x=>x.rem))} %.`]);
   if(k>=6){const a=avg(ms.slice(-3).map(x=>x.score)),b=avg(ms.slice(0,-3).map(x=>x.score));if(Math.abs(a-b)>=5)L.push([a>b?'g':'w',`Tes 3 dernières nuits sont ${a>b?'meilleures':'moins bonnes'} que les précédentes (score ${Math.round(a)} contre ${Math.round(b)}).`])}
   // habitudes
-  for(const [t] of TAGS){const w=ms.filter(x=>x.tags.includes(t)),wo=ms.filter(x=>!x.tags.includes(t));if(w.length<2||wo.length<2)continue;
+  const groups={};for(const [t] of TAGS){const key=ms.map(x=>x.tags.includes(t)?1:0).join('');if(!key.includes('1'))continue;(groups[key]=groups[key]||[]).push(t)}
+  for(const key in groups){const ts=groups[key],t=ts[0],w=ms.filter(x=>x.tags.includes(t)),wo=ms.filter(x=>!x.tags.includes(t));if(w.length<2||wo.length<2)continue;
     const ds=avg(w.map(x=>x.snore))-avg(wo.map(x=>x.snore)),dsc=avg(w.map(x=>x.score))-avg(wo.map(x=>x.score));
     const parts=[];if(Math.abs(ds)>=8)parts.push(`${ds>0?'+':'−'}${h(Math.abs(ds))} de ronflement`);if(Math.abs(dsc)>=4)parts.push(`score ${dsc>0?'+':'−'}${Math.round(Math.abs(dsc))}`);
-    L.push(['n',`Les soirs « ${tagLabel(t)} » (${w.length} nuits) : ${parts.length?parts.join(', '):'pas de différence nette'} par rapport aux autres (${wo.length} nuits). À confirmer avec plus de nuits.`])}
+    L.push(['n',`Les soirs « ${ts.map(tagLabel).join(' » + « ')} » (${w.length} nuits) : ${parts.length?parts.join(', '):'pas de différence nette'} par rapport aux autres (${wo.length} nuits).${ts.length>1?' Ces habitudes ont toujours été cochées ensemble : impossible de savoir laquelle joue.':''} À confirmer avec plus de nuits.`])}
   const used=new Set(ms.flatMap(x=>x.tags));if(!used.size)L.push(['n','Coche « Ta soirée » dans le rapport de chaque nuit (alcool, sport, café…) : l\'app pourra comparer tes nuits selon ces habitudes.']);
   const wkd=ms.filter(x=>{const d=new Date(x.day).getDay();return d===0||d===6}),wk=ms.filter(x=>{const d=new Date(x.day).getDay();return d>0&&d<6});
   if(wkd.length>=2&&wk.length>=2)L.push(['n',`Semaine : ${h(avg(wk.map(x=>x.asleep)))} de sommeil en moyenne ; week-end : ${h(avg(wkd.map(x=>x.asleep)))}.`]);
@@ -886,7 +889,7 @@ async function makeDemo(){
 (async()=>{await DB.open();
   // récupère une nuit restée « en cours » (page fermée, batterie vide…)
   try{for(const n of await DB.all('nights')){if(n.status==='en_cours'){n.end=n.start+Math.max(1,n.m.act.length)*60000;n.status='interrompue';finalizeNight(n);await DB.put('nights',n)}
-    else if(n.rules!=='2.2'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
+    else if(n.rules!=='2.6'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
   syncSettings();renderHome();
   try{const c=document.createElement('canvas');c.width=c.height=180;const g=c.getContext('2d');g.fillStyle='#0b1020';g.fillRect(0,0,180,180);g.fillStyle='#8aa4ff';g.beginPath();g.arc(95,85,52,0,7);g.fill();g.fillStyle='#0b1020';g.beginPath();g.arc(120,68,46,0,7);g.fill();
     const l=document.createElement('link');l.rel='apple-touch-icon';l.href=c.toDataURL();document.head.appendChild(l);const l2=document.createElement('link');l2.rel='icon';l2.href=l.href;document.head.appendChild(l2)}catch(e){}
