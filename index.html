@@ -177,17 +177,17 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
     <h2>Comment ça marche</h2>
     <details><summary>Détection des sons</summary>
       <p class="mut small">Le micro mesure en continu le niveau sonore et le compare au bruit de fond de la chambre, qui s'ajuste tout seul. Chaque son qui dépasse ce fond est analysé : durée, attaque, répartition graves / médiums / aigus, rythme.</p>
-      <p class="mut small">• <b>Mouvement</b> : froissement bref et large bande (draps).<br>• <b>Ronflement</b> : son grave qui revient régulièrement toutes les 2 à 10 s (au moins 3 de suite).<br>• <b>Toux</b> : son court, fort, à attaque brutale.<br>• <b>Parole</b> : son de plus d'une seconde dans les médiums, haché en syllabes.<br>• <b>Bruit</b> : son long (plus de 11 s) venant de l'extérieur, ignoré pour les phases.</p></details>
+      <p class="mut small">• <b>Mouvement</b> : froissement bref et large bande (draps).<br>• <b>Ronflement</b> : son grave qui revient régulièrement toutes les 2 à 10 s (au moins 3 de suite).<br>• <b>Toux</b> : son court, très fort, à attaque brutale, avec des aigus.<br>• <b>Parole</b> : repérée mais plus comptée (jamais confirmée sur tes nuits) ; quelques extraits restent pour vérifier.<br>• <b>Bruit</b> : son long (plus de 11 s) venant de l'extérieur, ignoré pour les phases.</p></details>
     <details><summary>Phases de sommeil</summary>
       <p class="mut small">Comme Sleep Cycle, l'app se base sur tes mouvements : beaucoup de mouvements = éveil ou sommeil léger, immobilité prolongée = sommeil profond. Elle repère les pics d'agitation qui marquent la fin de chaque cycle (souvent 80 à 110 min) et place le sommeil paradoxal en fin de cycle, plus long en fin de nuit.</p>
       <p class="mut small">C'est une <b>estimation</b> : seule une polysomnographie (avec mesure de l'activité du cerveau) mesure vraiment les phases. Utile pour suivre des tendances, pas pour poser un diagnostic.</p></details>
     <details><summary>Pauses respiratoires</summary>
-      <p class="mut small">Pendant un ronflement, l'app repère les silences complets d'au moins 10 secondes suivis d'une reprise bruyante (inspiration forte, ronflement plus fort) : c'est le schéma typique d'une apnée obstructive. Elle compte ces pauses par heure de sommeil et garde un extrait pour que tu puisses écouter.</p>
+      <p class="mut small">Pendant un ronflement bien installé et assez fort, l'app repère les silences complets d'au moins 10 secondes suivis d'une reprise bruyante (inspiration forte, ronflement plus fort) : c'est le schéma typique d'une apnée obstructive. Elle compte ces pauses par heure de sommeil et garde un extrait pour que tu puisses écouter.</p>
       <p class="mut small">Ce n'est qu'un dépistage indicatif : elle ne voit pas les apnées sans ronflement ni les hypopnées (respiration seulement réduite). Si l'indice dépasse souvent 5 par heure, ou en cas de fatigue dans la journée, de maux de tête au réveil ou de pauses vues par quelqu'un, parles-en à un médecin.</p></details>
     <details><summary>Réveil intelligent</summary>
-      <p class="mut small">Pendant la fenêtre choisie, dès qu'un mouvement net est détecté (signe de sommeil léger), la sonnerie démarre doucement. Sinon elle sonne à l'heure prévue.</p></details>
+      <p class="mut small">Pendant la fenêtre choisie, la sonnerie démarre doucement si tu sembles en sommeil léger (ni profond, ni paradoxal), sans ronfler, avec une agitation nettement plus forte que d'habitude. Sinon elle sonne à l'heure prévue.</p></details>
   </div>
-  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.6</p>
+  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.7</p>
 </section>
 
 <nav class="tabs" id="tabs">
@@ -204,7 +204,7 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
   <div class="nsub small" id="nStatus">Calibrage du bruit de fond…</div>
   <div class="ncount">
     <div><b id="cMov">0</b>Mouvements</div><div><b id="cSnore">0</b>Ronflements</div>
-    <div><b id="cCough">0</b>Toux</div><div><b id="cTalk">0</b>Paroles</div>
+    <div><b id="cCough">0</b>Toux</div><div><b id="cTalk">0</b>Pauses</div>
   </div>
   <div class="nsub small" id="nLast"></div>
   <div class="warn" id="wlWarn" hidden>Ton navigateur ne peut pas garder l'écran allumé tout seul. Règle le verrouillage automatique sur « Jamais » le temps de la nuit (Réglages › Luminosité / Affichage).</div>
@@ -282,13 +282,13 @@ function nearSnore(n,t,w=12000){const sn=n.snores;if(!sn||!sn.length)return fals
   return Math.abs(T[lo]-t)<=w||(lo>0&&Math.abs(T[lo-1]-t)<=w)}
 function evRule(n,e){const thr=SENS[n.sens]||8;
   if(e.type==='parole'){const x=e.x;if((x&&x[2]<0.08)||nearSnore(n,e.t))return{act:0,k:null}}
-  if(e.type==='mouvement'&&e.x&&e.d>=0.6&&e.x[2]<0.25&&e.x[4]>=0.2&&nearSnore(n,e.t,15000))return{act:0,k:null}; // v2.2/2.5 : ronflement mal classé
+  if(e.type==='mouvement'&&e.x&&e.d>=0.6&&e.x[2]<0.3&&e.x[4]>=0.2&&nearSnore(n,e.t,15000))return{act:0,k:null}; // v2.2/2.5/2.7 : ronflement mal classé
   if(e.type==='parole'&&n.snores&&(nearSnore(n,e.t,60000)||(e.x&&(e.x[2]<0.12||e.x[3]/Math.max(.1,e.d)<1.5))))return{act:0.02,k:null}; // v2.5
   if(e.type==='toux'&&e.x&&(e.x[2]<0.12||e.x[2]>0.6||e.x[1]<0.25||e.d<0.2))return{act:0.02,k:null}; // v2.5 : « toux » sans aigus = début de ronflement ou clic
   switch(e.type){
     case 'mouvement':{const big=e.d>=0.6||e.p>=thr+22;return big?{act:1+Math.min(2,Math.max(0,e.p-thr)/15),k:'mov'}:{act:0.02,k:null}}
-    case 'toux':return e.p>=thr+18?{act:0.7,k:'cough'}:{act:0.02,k:null};
-    case 'parole':return e.d>=1&&e.p>=thr+14?{act:0.4,k:'talk'}:{act:0.02,k:null};
+    case 'toux':return e.p>=thr+32?{act:0.7,k:'cough'}:{act:0.02,k:null}; // v2.7 : 0 toux confirmée sur 8, toutes entre 27 et 42 dB
+    case 'parole':return e.d>=1&&e.p>=thr+14?{act:0.4,k:null}:{act:0.02,k:null}; // v2.7 : plus comptée (0 parole confirmée sur 17), compte seulement comme activité
     case 'bruit':return{act:0,k:'noise'};
   }return{act:0,k:null}}
 function applyEv(n,e){const i=Math.max(0,Math.floor((e.t-n.start)/60000));ensureMin(n,i);const m=n.m,r=evRule(n,e);m.act[i]+=r.act;if(r.k)m[r.k][i]++}
@@ -343,8 +343,10 @@ function finalizeNight(n){
   const dur=Math.max(1,Math.ceil(((n.end||Date.now())-n.start)/60000));ensureMin(n,dur-1);
   // v1.9 : ne garder que les pauses précédées d'au moins 3 ronflements confirmés dans la minute
   if(n.snores&&n.snores.length&&(n.apneasRaw||n.apneas)){n.apneasRaw=n.apneasRaw||n.apneas.slice();const T=n.snores.map(x=>x[0]);
-    n.apneas=n.apneasRaw.filter(a=>T.filter(t=>t<=a.t&&a.t-t<=60000).length>=3)}
-  rebuildAct(n);n.analysis=analyze(n);n.rules='2.6';
+    const mt=(SENS[n.sens]||8)+22;
+    n.apneas=n.apneasRaw.filter(a=>{const P=n.snores.filter(x=>x[0]<=a.t&&a.t-x[0]<=60000).map(x=>x[2]).sort((x,y)=>x-y);
+      return P.length>=3&&P[Math.floor(P.length/2)]>=mt})} // v1.9 + v2.7 : ronflement installé et assez fort
+  rebuildAct(n);n.analysis=analyze(n);n.rules='2.7';
   const c={mouvement:0,toux:0,parole:0,bruit:0};n.events.forEach(e=>{if(c[e.type]!==undefined&&(e.type==='bruit'||significant(n,e)))c[e.type]++});
   c.ronfMin=n.m.snore.reduce((a,v)=>a+v,0)/60;c.episodes=n.snoreEps.length;c.pauses=(n.apneas||[]).length;n.counts=c;
 }
@@ -425,11 +427,11 @@ class Tracker{
     else if(dur>=0.6&&dur<=3.5&&fh<0.08&&attack>=0.25&&ev.peak>=this.thr+10)type='snore?';
     else if(dur>=0.8&&fm>=0.45&&fh>=0.12&&syl>=3&&syl/dur>=1.5&&fl<0.4&&ev.t-this.lastSnoreEnd>60000)type='parole'; // v2.5 : 0 parole confirmée sur 12
     else if(attack<=0.1&&ev.peak>=this.thr+9&&fm+fh>=0.55&&fh>=0.12&&fh<=0.6&&fm>=0.25&&dur>=0.2&&(dur<=0.8||(dur<=2.5&&syl<=3)))type='toux'; // v2.5 : une vraie toux contient des aigus
-    else if(dur>=0.4&&dur<=4&&fl>=0.35&&fh<0.2&&ev.peak>=this.thr+10)type='snore?';
+    else if(dur>=0.4&&dur<=4&&fl>=0.35&&fh<0.2&&attack>=0.1&&ev.peak>=this.thr+10)type='snore?'; // v2.7 : attaque instantanée = choc, pas un ronflement
     else type='mouvement';
     const e={t:ev.t,d:dur,p:ev.peak,type,sIdx:ev.sIdx,eIdx:ev.eIdx,f:{d:+dur.toFixed(2),p:+ev.peak.toFixed(1),fl:+fl.toFixed(2),fm:+fm.toFixed(2),fh:+fh.toFixed(2),syl,att:+attack.toFixed(2)}};
     // v2.2 : pendant une période de ronflement, un son tonal qui monte lentement est un ronflement (souvent plusieurs fusionnés), pas un mouvement ni de la parole — 6 requalifications du 18/11
-    if((type==='mouvement'||type==='parole')&&dur>=0.6&&dur<=12&&attack>=0.2&&fh<0.25&&((this.ep&&ev.t-this.ep.last<=15000)||ev.t-this.lastSnoreEnd<=15000))type='snore?';
+    if((type==='mouvement'||type==='parole')&&dur>=0.6&&dur<=12&&attack>=0.2&&fh<0.3&&((this.ep&&ev.t-this.ep.last<=15000)||ev.t-this.lastSnoreEnd<=15000))type='snore?';
     if(type==='bruit'){const so=[...fr].sort((a,b)=>a-b);this.floor+=Math.max(0,so[Math.floor(so.length/2)]-2)}
     if(type==='snore?')this.snoreCand(e);else this.commit(e);
   }
@@ -440,6 +442,7 @@ class Tracker{
     const ctx=this.recentSn.filter(x=>prevSnd-x.t<=60000&&x.t<=prevSnd);if(ctx.length<5)return; // v1.9 : ronflement bien installé (5+ dans la minute), cf. requalifications du 17/11
     const med=ctx.map(x=>x.p).sort((a,b)=>a-b)[Math.floor(ctx.length/2)];
     if(ev.peak<Math.max(this.thr+14,med))return;
+    if(med<this.thr+22)return; // v2.7 : les 3 fausses pauses avaient un ronflement faible (médiane 24 à 33 dB), les vraies ≥ 34 dB
     const a={t:Math.round(prevSnd),d:+gap.toFixed(1),p:+ev.peak.toFixed(1)};this.night.apneas.push(a);
     this.onEvent&&this.onEvent({type:'pause'});
     if(this.maxClips){const R=this.rate,to=ev.sIdx+Math.round(5*R),from=Math.max(ev.sIdx-Math.round(Math.min(gap+4,22)*R),to-Math.round(30*R));
@@ -462,7 +465,8 @@ class Tracker{
     if(!this.maxClips)return;
     if(e.type==='mouvement'&&e.p<this.thr+8)return;
     if(e.type==='bruit'&&e.p<this.thr+12)return;
-    if((e.type==='toux'||e.type==='parole')&&!significant(this.night,e))return; // n'extraire que ce qui est compté
+    if(e.type==='toux'&&!significant(this.night,e))return; // n'extraire que ce qui est compté
+    if(e.type==='parole'&&!(e.d>=1&&e.p>=this.thr+14&&!nearSnore(this.night,e.t,60000)))return; // v2.7 : parole plus comptée, mais quelques extraits restent pour vérifier
     const R=this.rate,score=e.p+({parole:6,toux:4,ronflement:3,mouvement:0,bruit:-3}[e.type]||0);
     const from=e.sIdx-Math.round(3*R);let to=e.eIdx+Math.round(3*R);if(to-from>30*R)to=from+Math.round(30*R);
     const last=this.clipQ[this.clipQ.length-1];
@@ -561,7 +565,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 function releaseAwake(){try{App.wl&&App.wl.release()}catch(e){}App.wl=null}
 function onLive(e){const n=App.tr.night,c=n.counts||{};
   const cnt=t=>n.events.filter(x=>x.type===t&&significant(n,x)).length;
-  $('#cMov').textContent=cnt('mouvement');$('#cCough').textContent=cnt('toux');$('#cTalk').textContent=cnt('parole');
+  $('#cMov').textContent=cnt('mouvement');$('#cCough').textContent=cnt('toux');$('#cTalk').textContent=(n.apneas||[]).length;
   $('#cSnore').textContent=n.snoreEps.length+(App.tr.ep?1:0);
   if(TYPES[e.type])$('#nLast').textContent=`Dernier : ${TYPES[e.type].l.toLowerCase()} à ${hm(Date.now())}`}
 function nightTick(){const now=Date.now(),t=hm(now);$('#nClock').textContent=t;$('#dClock').textContent=t;const tr=App.tr;if(!tr||!tr.running)return;
@@ -657,7 +661,7 @@ function renderReport(n){const a=n.analysis,c=n.counts||{},asl=Math.max(1,a.asle
   <div class="card"><h2>Analyse de la nuit</h2><div id="insN" class="mut small">…</div></div>
   <div class="card"><h2>Ta soirée</h2><p class="mut small" style="margin:0 0 10px">Coche ce qui s'applique : l'app comparera tes nuits selon ces habitudes.</p><div class="chips" id="tags">${TAGS.map(t=>`<button data-t="${t[0]}"${(n.tags||[]).includes(t[0])?' class="on"':''}>${t[1]}</button>`).join('')}</div></div>
   <div class="card"><h2>Ta nuit</h2><canvas id="cvH" height="262"></canvas>
-    <div class="legend"><span style="color:#ff6b6b">▲ pause respiratoire</span><span style="color:#ff9f6b">● toux</span><span style="color:#4cd6a0">● parole</span><span style="color:#f2b84b">┆ réveil</span></div>
+    <div class="legend"><span style="color:#ff6b6b">▲ pause respiratoire</span><span style="color:#ff9f6b">● toux</span><span style="color:#f2b84b">┆ réveil</span></div>
     <p class="mut small" style="margin:8px 0 0">Plus la ligne est basse, plus le sommeil est profond. Chaque bande de fond est un cycle. Les barres des pistes sont regroupées par tranches de 5 min.</p></div>
   <div class="card"><h2>Phases</h2>${[3,2,1,0].map(i=>`<div class="phase"><span class="lab">${STAGES[i].l}</span><div class="bar"><div style="width:${pctS(i)}%;background:${STAGES[i].c}"></div></div><span class="val">${fmtDur(a.tot[i])} · ${pctS(i)} %</span></div>`).join('')}
     <p class="mut small" style="margin:10px 0 0">Repères adultes : profond ~15-25 %, paradoxal ~20-25 % du sommeil. Estimation à partir des mouvements, à lire comme une tendance.</p></div>
@@ -665,7 +669,8 @@ function renderReport(n){const a=n.analysis,c=n.counts||{},asl=Math.max(1,a.asle
     <div><b>${c.mouvement||0}</b><span>mouvements · ${a.awak} réveil${a.awak>1?'s':''} probable${a.awak>1?'s':''}</span></div>
     <div><b>${fmtDur(c.ronfMin||0)}</b><span>de ronflement · ${c.episodes||0} épisode${(c.episodes||0)>1?'s':''}</span></div>
     <div><b>${c.toux||0}</b><span>toux</span></div>
-    <div><b>${c.parole||0}</b><span>paroles</span></div></div>
+    <div><b>${c.pauses||0}</b><span>pause${(c.pauses||0)>1?'s':''} suspecte${(c.pauses||0)>1?'s':''}</span></div></div>
+    <p class="mut small" style="margin:10px 0 0">Seules les toux fortes sont comptées. La parole n'est plus comptée : elle n'a jamais été confirmée sur tes nuits.</p>
     ${c.bruit?`<p class="mut small" style="margin:10px 0 0">${c.bruit} bruit${c.bruit>1?'s':''} extérieur${c.bruit>1?'s':''} long${c.bruit>1?'s':''} ignoré${c.bruit>1?'s':''} pour les phases.</p>`:''}</div>
   ${respCard(n)}
   <div class="card"><h2>Niveau sonore</h2><p class="mut small" style="margin:0 0 6px">En dB au-dessus du calme de ta chambre (0 = les minutes les plus calmes), moyenne par minute. Mesure relative : le micro du téléphone n'est pas un sonomètre.</p><canvas id="cvN" height="120"></canvas></div>
@@ -712,8 +717,8 @@ function drawHypno(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),a=n.analysis
   const sn=[];for(let k=0;k<nb;k++){let t=0;for(let i=k*B;i<Math.min(N,k*B+B);i++)t+=m.snore[i]||0;sn.push(Math.min(1,t/(B*60*0.5)))}
   lane(y,hh,'Ronflement',fmtDur((n.counts&&n.counts.ronfMin)||0));
   g.fillStyle='rgba(199,125,255,.85)';sn.forEach((v,k)=>{if(v<0.02)return;const hv=Math.max(2,v*(hh-4));g.fillRect(bx(k),y+hh-hv,bw,hv)});
-  y+=hh+8;const eh=20;lane(y,eh,'Autres','');const ey=y+eh/2;
-  n.events.forEach(e=>{if((e.type!=='toux'&&e.type!=='parole')||!significant(n,e))return;const i=(e.t-n.start)/60000;g.fillStyle=e.type==='toux'?'#ff9f6b':'#4cd6a0';g.globalAlpha=.8;g.beginPath();g.arc(x(i),ey+(e.type==='toux'?-3:3),2.6,0,7);g.fill();g.globalAlpha=1});
+  y+=hh+8;const eh=20;lane(y,eh,'Pauses, toux','');const ey=y+eh/2;
+  n.events.forEach(e=>{if(e.type!=='toux'||!significant(n,e))return;const i=(e.t-n.start)/60000;g.fillStyle=e.type==='toux'?'#ff9f6b':'#4cd6a0';g.globalAlpha=.8;g.beginPath();g.arc(x(i),ey+(e.type==='toux'?-3:3),2.6,0,7);g.fill();g.globalAlpha=1});
   (n.apneas||[]).forEach(e=>{const i=(e.t-n.start)/60000;g.fillStyle='#ff6b6b';g.beginPath();g.moveTo(x(i),ey-7);g.lineTo(x(i)-5,ey+6);g.lineTo(x(i)+5,ey+6);g.fill()});
   timeAxis(g,n,R+6-0,h-4,L)}
 function drawNoise(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),d=n.m.db,N=d.length,raw=d.map((x,i)=>n.m.dbn[i]?x:null),ok=raw.filter(x=>x!==null);if(!ok.length)return;
@@ -784,7 +789,7 @@ function nightInsights(n,others){const m=met(n),o=others.map(met),L=[],h=fmtDur;
   // réveil
   if(n.alarm&&n.alarm.rang)L.push(['n',n.alarm.reason==='leger'?`Réveil intelligent à ${hm(n.alarm.rang)}, pendant une phase de sommeil léger.`:`Réveil à l'heure prévue (${hm(n.alarm.rang)}) : pas de phase légère repérée avant dans la fenêtre.`]);
   // toux
-  if(m.toux>20)L.push(['n',`${m.toux} toux détectées : c'est beaucoup, une partie est sans doute autre chose. Requalifie les extraits « Toux » pour affiner.`]);
+  if(m.toux>5)L.push(['n',`${m.toux} toux fortes détectées : écoute les extraits « Toux » et requalifie-les pour vérifier.`]);
   // rang dans l'historique
   if(o.length>=2){const all=[m,...o].sort((a,b)=>b.score-a.score),r=all.indexOf(m)+1;if(r===1)L.push(['g',`Ta meilleure nuit sur les ${all.length} enregistrées.`]);else if(r===all.length)L.push(['n',`La nuit la moins bonne sur les ${all.length} enregistrées.`])}
   return L}
@@ -889,7 +894,7 @@ async function makeDemo(){
 (async()=>{await DB.open();
   // récupère une nuit restée « en cours » (page fermée, batterie vide…)
   try{for(const n of await DB.all('nights')){if(n.status==='en_cours'){n.end=n.start+Math.max(1,n.m.act.length)*60000;n.status='interrompue';finalizeNight(n);await DB.put('nights',n)}
-    else if(n.rules!=='2.6'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
+    else if(n.rules!=='2.7'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
   syncSettings();renderHome();
   try{const c=document.createElement('canvas');c.width=c.height=180;const g=c.getContext('2d');g.fillStyle='#0b1020';g.fillRect(0,0,180,180);g.fillStyle='#8aa4ff';g.beginPath();g.arc(95,85,52,0,7);g.fill();g.fillStyle='#0b1020';g.beginPath();g.arc(120,68,46,0,7);g.fill();
     const l=document.createElement('link');l.rel='apple-touch-icon';l.href=c.toDataURL();document.head.appendChild(l);const l2=document.createElement('link');l2.rel='icon';l2.href=l.href;document.head.appendChild(l2)}catch(e){}
