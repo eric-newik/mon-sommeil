@@ -187,7 +187,7 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
     <details><summary>Réveil intelligent</summary>
       <p class="mut small">Pendant la fenêtre choisie, la sonnerie démarre doucement si tu sembles en sommeil léger (ni profond, ni paradoxal), sans ronfler, avec une agitation nettement plus forte que d'habitude. Sinon elle sonne à l'heure prévue.</p></details>
   </div>
-  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.7</p>
+  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.8</p>
 </section>
 
 <nav class="tabs" id="tabs">
@@ -283,6 +283,7 @@ function nearSnore(n,t,w=12000){const sn=n.snores;if(!sn||!sn.length)return fals
 function evRule(n,e){const thr=SENS[n.sens]||8;
   if(e.type==='parole'){const x=e.x;if((x&&x[2]<0.08)||nearSnore(n,e.t))return{act:0,k:null}}
   if(e.type==='mouvement'&&e.x&&e.d>=0.6&&e.x[2]<0.3&&e.x[4]>=0.2&&nearSnore(n,e.t,15000))return{act:0,k:null}; // v2.2/2.5/2.7 : ronflement mal classé
+  if(e.type==='mouvement'&&e.x&&e.d<=3&&e.x[2]<0.1&&e.x[3]<=3&&e.p>=thr+40)return{act:0.02,k:null}; // v2.8 : son fort, bref, sans aigus ni froissement = ronflement isolé ou toux, pas un mouvement (10 sur 10 requalifiés)
   if(e.type==='parole'&&n.snores&&(nearSnore(n,e.t,60000)||(e.x&&(e.x[2]<0.12||e.x[3]/Math.max(.1,e.d)<1.5))))return{act:0.02,k:null}; // v2.5
   if(e.type==='toux'&&e.x&&(e.x[2]<0.12||e.x[2]>0.6||e.x[1]<0.25||e.d<0.2))return{act:0.02,k:null}; // v2.5 : « toux » sans aigus = début de ronflement ou clic
   switch(e.type){
@@ -346,7 +347,7 @@ function finalizeNight(n){
     const mt=(SENS[n.sens]||8)+22;
     n.apneas=n.apneasRaw.filter(a=>{const P=n.snores.filter(x=>x[0]<=a.t&&a.t-x[0]<=60000).map(x=>x[2]).sort((x,y)=>x-y);
       return P.length>=3&&P[Math.floor(P.length/2)]>=mt})} // v1.9 + v2.7 : ronflement installé et assez fort
-  rebuildAct(n);n.analysis=analyze(n);n.rules='2.7';
+  rebuildAct(n);n.analysis=analyze(n);n.rules='2.8';
   const c={mouvement:0,toux:0,parole:0,bruit:0};n.events.forEach(e=>{if(c[e.type]!==undefined&&(e.type==='bruit'||significant(n,e)))c[e.type]++});
   c.ronfMin=n.m.snore.reduce((a,v)=>a+v,0)/60;c.episodes=n.snoreEps.length;c.pauses=(n.apneas||[]).length;n.counts=c;
 }
@@ -894,7 +895,7 @@ async function makeDemo(){
 (async()=>{await DB.open();
   // récupère une nuit restée « en cours » (page fermée, batterie vide…)
   try{for(const n of await DB.all('nights')){if(n.status==='en_cours'){n.end=n.start+Math.max(1,n.m.act.length)*60000;n.status='interrompue';finalizeNight(n);await DB.put('nights',n)}
-    else if(n.rules!=='2.7'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
+    else if(n.rules!=='2.8'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
   syncSettings();renderHome();
   try{const c=document.createElement('canvas');c.width=c.height=180;const g=c.getContext('2d');g.fillStyle='#0b1020';g.fillRect(0,0,180,180);g.fillStyle='#8aa4ff';g.beginPath();g.arc(95,85,52,0,7);g.fill();g.fillStyle='#0b1020';g.beginPath();g.arc(120,68,46,0,7);g.fill();
     const l=document.createElement('link');l.rel='apple-touch-icon';l.href=c.toDataURL();document.head.appendChild(l);const l2=document.createElement('link');l2.rel='icon';l2.href=l.href;document.head.appendChild(l2)}catch(e){}
