@@ -187,7 +187,7 @@ details summary{cursor:pointer;color:var(--acc)}details p{margin:8px 0}
     <details><summary>Réveil intelligent</summary>
       <p class="mut small">Pendant la fenêtre choisie, la sonnerie démarre doucement si tu sembles en sommeil léger (ni profond, ni paradoxal), sans ronfler, avec une agitation nettement plus forte que d'habitude. Sinon elle sonne à l'heure prévue.</p></details>
   </div>
-  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.8</p>
+  <p class="mut small" style="text-align:center">Mon Sommeil · version 2.9</p>
 </section>
 
 <nav class="tabs" id="tabs">
@@ -249,7 +249,7 @@ function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.style.displa
 function ask(msg,ok='Confirmer'){return new Promise(res=>{$('#mText').textContent=msg;$('#mOk').textContent=ok;$('#modal').classList.add('show');
   const done=v=>{$('#modal').classList.remove('show');$('#mOk').onclick=$('#mNo').onclick=null;res(v)};$('#mOk').onclick=()=>done(true);$('#mNo').onclick=()=>done(false)})}
 
-const TYPES={mouvement:{l:'Mouvement',i:'🔄'},ronflement:{l:'Ronflement',i:'😴'},toux:{l:'Toux',i:'😷'},parole:{l:'Parole',i:'💬'},bruit:{l:'Bruit',i:'🔊'},pause:{l:'Pause respiratoire ?',i:'⏸️'}};
+const TYPES={mouvement:{l:'Mouvement',i:'🔄'},ronflement:{l:'Ronflement',i:'😴'},toux:{l:'Toux',i:'😷'},parole:{l:'Parole',i:'💬'},bruit:{l:'Bruit',i:'🔊'},pause:{l:'Pause respiratoire ?',i:'⏸️'},grave:{l:'Son grave régulier',i:'〰️'}};
 const STAGES=[{l:'Éveil',c:'#f2b84b'},{l:'Léger',c:'#5ec8f2'},{l:'Paradoxal',c:'#c77dff'},{l:'Profond',c:'#3d5afe'}];
 
 /* ---------- réglages ---------- */
@@ -347,7 +347,7 @@ function finalizeNight(n){
     const mt=(SENS[n.sens]||8)+22;
     n.apneas=n.apneasRaw.filter(a=>{const P=n.snores.filter(x=>x[0]<=a.t&&a.t-x[0]<=60000).map(x=>x[2]).sort((x,y)=>x-y);
       return P.length>=3&&P[Math.floor(P.length/2)]>=mt})} // v1.9 + v2.7 : ronflement installé et assez fort
-  rebuildAct(n);n.analysis=analyze(n);n.rules='2.8';
+  rebuildAct(n);n.analysis=analyze(n);n.rules='2.9';
   const c={mouvement:0,toux:0,parole:0,bruit:0};n.events.forEach(e=>{if(c[e.type]!==undefined&&(e.type==='bruit'||significant(n,e)))c[e.type]++});
   c.ronfMin=n.m.snore.reduce((a,v)=>a+v,0)/60;c.episodes=n.snoreEps.length;c.pauses=(n.apneas||[]).length;n.counts=c;
 }
@@ -465,11 +465,13 @@ class Tracker{
   considerClip(e){
     if(!this.maxClips)return;
     if(e.type==='mouvement'&&e.p<this.thr+8)return;
+    // v2.9 : sons purement graves, faibles et réguliers comptés en mouvements (25/11 : ~320 sons entre 0 h 32 et 1 h 17) -> extraits à part pour les identifier
+    if(e.type==='mouvement'&&e.f&&e.f.fl>=0.9&&e.f.fh<0.05&&e.f.syl<=2){if(this.clips.some(x=>x.type==='grave'&&Math.abs(x.t-e.t)<15*60000)||this.clipQ.some(x=>x.type==='grave'&&Math.abs(x.t-e.t)<15*60000&&e.sIdx-3*this.rate>x.to))return;e=Object.assign({},e,{type:'grave'})}
     if(e.type==='bruit'&&e.p<this.thr+12)return;
     if(e.type==='toux'&&!significant(this.night,e))return; // n'extraire que ce qui est compté
     if(e.type==='parole'&&!(e.d>=1&&e.p>=this.thr+14&&!nearSnore(this.night,e.t,60000)))return; // v2.7 : parole plus comptée, mais quelques extraits restent pour vérifier
-    const R=this.rate,score=e.p+({parole:6,toux:4,ronflement:3,mouvement:0,bruit:-3}[e.type]||0);
-    const from=e.sIdx-Math.round(3*R);let to=e.eIdx+Math.round(3*R);if(to-from>30*R)to=from+Math.round(30*R);
+    const R=this.rate,score=e.p+({parole:6,toux:4,ronflement:3,mouvement:0,bruit:-3,grave:20}[e.type]||0);
+    const from=e.sIdx-Math.round(3*R);let to=e.eIdx+Math.round((e.type==='grave'?20:3)*R);if(to-from>30*R)to=from+Math.round(30*R);
     const last=this.clipQ[this.clipQ.length-1];
     if(last&&from<=last.to){last.to=Math.min(Math.max(last.to,to),last.from+Math.round(30*R));if(score>last.score&&last.type!=='pause'){last.score=score;last.type=e.type;last.f=e.f}return}
     this.clipQ.push({from,to,score,type:e.type,t:e.t-3000,f:e.f});
@@ -477,6 +479,8 @@ class Tracker{
   flushClips(force){while(this.clipQ.length&&(force||this.total>=this.clipQ[0].to))this.saveClip(this.clipQ.shift())}
   saveClip(c){
     const from=Math.max(c.from,this.total-this.ringLen+1,0),to=Math.min(c.to,this.total);if(to-from<this.rate*0.5)return;
+    if(c.type==='grave'){const g=this.clips.map((x,i)=>i).filter(i=>this.clips[i].type==='grave');
+      if(g.length>=3){let mi=g[0];for(const i of g)if(this.clips[i].score<this.clips[mi].score)mi=i;if(this.clips[mi].score>=c.score)return;const old=this.clips.splice(mi,1)[0];DB.del('clips',old.id).catch(()=>{})}}
     if(this.clips.length>=this.maxClips){
       // v2.1 : garder au moins 2 extraits de chaque type détecté (toux, parole, pauses…) pour pouvoir les requalifier
       const Q=2,cnt={};this.clips.forEach(x=>cnt[x.type]=(cnt[x.type]||0)+1);
@@ -732,12 +736,12 @@ function drawNoise(cv,n){if(!cv)return;const[g,w,h]=setupCanvas(cv),d=n.m.db,N=d
   const pk=v.reduce((b,x,i)=>x!==null&&x>(v[b]??-1)?i:b,0);if(v[pk]>0){g.fillStyle='#e8ecf8';g.beginPath();g.arc(X(pk),y(v[pk]),3,0,7);g.fill();g.textAlign=X(pk)>w-60?'right':'left';g.fillText('pic +'+Math.round(v[pk])+' dB · '+hm(n.start+pk*60000),X(pk)+(g.textAlign==='left'?6:-6),Math.max(top+9,y(v[pk])-4))}
   timeAxis(g,n,w-4,h-4,L)}
 const REAL=[['ronflement','Ronflement'],['pause','Pause respiratoire'],['respiration','Respiration normale'],['toux','Toux'],['parole','Parole'],['mouvement','Mouvement / draps'],['bruit','Bruit extérieur'],['autre','Autre / rien']];
-const QUEST={pause:'Vraie pause respiratoire ?',parole:'Vraiment de la parole ?',toux:'Vraiment une toux ?',ronflement:'Vraiment un ronflement ?',mouvement:'Vraiment un mouvement ?',bruit:'Vraiment un bruit extérieur ?'};
+const QUEST={pause:'Vraie pause respiratoire ?',parole:'Vraiment de la parole ?',toux:'Vraiment une toux ?',ronflement:'Vraiment un ronflement ?',mouvement:'Vraiment un mouvement ?',grave:'Vraiment un mouvement ?',bruit:'Vraiment un bruit extérieur ?'};
 function verdictUI(c,n){const lb=(n.labels||{})[c.id]||{},v=lb.verdict;
   return `<div class="verdict"><span>${QUEST[c.type]||'Bien détecté ?'}</span><button class="ok${v==='ok'?' on':''}" data-v="ok">✓ Oui</button><button class="no${v==='non'?' on':''}" data-v="non">✗ Non</button>
-  <select ${v==='non'?'':'hidden'}><option value="">C'était plutôt…</option>${REAL.filter(r=>r[0]!==c.type).map(r=>`<option value="${r[0]}"${lb.real===r[0]?' selected':''}>${r[1]}</option>`).join('')}</select>${v?'<span class="lbsaved">enregistré</span>':''}</div>`}
+  <select ${v==='non'?'':'hidden'}><option value="">C'était plutôt…</option>${REAL.filter(r=>r[0]!==(c.type==='grave'?'mouvement':c.type)).map(r=>`<option value="${r[0]}"${lb.real===r[0]?' selected':''}>${r[1]}</option>`).join('')}</select>${v?'<span class="lbsaved">enregistré</span>':''}</div>`}
 async function saveLabel(n,c,verdict,real){n.labels=n.labels||{};
-  n.labels[c.id]={t:Math.round(c.t),type:c.type,verdict,real:verdict==='ok'?c.type:(real||null),f:c.f||null,score:c.score,dur:c.dur,sens:c.sens||n.sens,at:Date.now()};
+  n.labels[c.id]={t:Math.round(c.t),type:c.type,verdict,real:verdict==='ok'?(c.type==='grave'?'mouvement':c.type):(real||null),f:c.f||null,score:c.score,dur:c.dur,sens:c.sens||n.sens,at:Date.now()};
   await DB.put('nights',n)}
 function wireVerdict(v,n,cl){const id=v.closest('.clip').dataset.id,c=cl.find(x=>x.id===id),sel=v.querySelector('select');
   const mark=()=>{const lb=n.labels[id];v.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===lb.verdict));sel.hidden=lb.verdict!=='non';
@@ -895,7 +899,7 @@ async function makeDemo(){
 (async()=>{await DB.open();
   // récupère une nuit restée « en cours » (page fermée, batterie vide…)
   try{for(const n of await DB.all('nights')){if(n.status==='en_cours'){n.end=n.start+Math.max(1,n.m.act.length)*60000;n.status='interrompue';finalizeNight(n);await DB.put('nights',n)}
-    else if(n.rules!=='2.8'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
+    else if(n.rules!=='2.9'&&!(App.tr&&App.tr.night.id===n.id)){finalizeNight(n);await DB.put('nights',n)}}}catch(e){console.warn(e)}
   syncSettings();renderHome();
   try{const c=document.createElement('canvas');c.width=c.height=180;const g=c.getContext('2d');g.fillStyle='#0b1020';g.fillRect(0,0,180,180);g.fillStyle='#8aa4ff';g.beginPath();g.arc(95,85,52,0,7);g.fill();g.fillStyle='#0b1020';g.beginPath();g.arc(120,68,46,0,7);g.fill();
     const l=document.createElement('link');l.rel='apple-touch-icon';l.href=c.toDataURL();document.head.appendChild(l);const l2=document.createElement('link');l2.rel='icon';l2.href=l.href;document.head.appendChild(l2)}catch(e){}
