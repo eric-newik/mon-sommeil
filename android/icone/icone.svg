@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b2350"/><stop offset="1" stop-color="#0b1020"/></linearGradient>
+<linearGradient id="moon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9e2ff"/><stop offset="1" stop-color="#8aa4ff"/></linearGradient>
+<radialGradient id="glow" cx="0.44" cy="0.42" r="0.4"><stop offset="0" stop-color="#8aa4ff" stop-opacity=".35"/><stop offset="1" stop-color="#8aa4ff" stop-opacity="0"/></radialGradient>
+<mask id="cres"><rect width="1024" height="1024" fill="#000"/><circle cx="470" cy="440" r="210" fill="#fff"/><circle cx="560" cy="370" r="185" fill="#000"/></mask>
+</defs><rect width="1024" height="1024" rx="230" fill="url(#bg)"/><circle cx="460" cy="440" r="330" fill="url(#glow)"/>
+<rect width="1024" height="1024" fill="url(#moon)" mask="url(#cres)"/>
+<g fill="#e8ecf8"><circle cx="660" cy="330" r="11"/><circle cx="720" cy="440" r="7" opacity=".8"/><circle cx="610" cy="250" r="6" opacity=".7"/></g>
+<path d="M300 745 H380 V700 H450 V780 H540 V725 H610 V760 H724" fill="none" stroke="#5ec8f2" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="724" cy="760" r="20" fill="#c77dff"/></svg>
